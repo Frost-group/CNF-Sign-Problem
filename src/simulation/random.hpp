@@ -1,5 +1,5 @@
-#ifndef RANDOM_X_HPP
-#define RANDOM_X_HPP
+#ifndef RANDOM_HPP
+#define RANDOM_HPP
 
 typedef unsigned int XRandUInt;
 typedef float XRandF;

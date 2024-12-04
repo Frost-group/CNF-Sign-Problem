@@ -1,63 +1,50 @@
 #include "simulation.hpp"
-#include <fstream>
 #include <iostream>
+#include <fstream>
 #include <ctime>
 
-int main(int argc, char *argv[]) {
-
-  std::ifstream in_file;
-  in_file.open("options.txt");
+int main(int argc, char *argv[])
+{
   std::ofstream out_file;
-  out_file.open("output.txt");
+  std::ifstream in_file;
   XSimulation simul;
-  /*simul.Initial(in_file);
-  simul.Dump(out_file);
-  simul.FillENk();
-  simul.FillVB();
-  simul.FillForceVB();
-  simul.DumpForce(out_file);
-  simul.DumpEnergy(out_file);
-  simul.UpdateMNHC_VV3();
-  simul.UpdateMNHC_VV3();
-  //simul.Dump(out_file);
-  for (int i = 0; i < 1000; ++i)
-    simul.UpdateMNHC_VV3();
-  simul.Dump(out_file);*/
-  simul.Initial(in_file);
-  int i;
+
+  out_file.open("output_" + std::string(argv[1]) + ".txt");
+  in_file.open("options.txt");
+
+  simul.Initial(in_file, atoi(argv[1]));
+
   clock_t t;
+  int i;
+
+  std::cout << "Starting simulation..." << std::endl;
+
   t = clock();
-  for (i = 0; i < simul.skip; ++i) {
+
+  for (i = 0; i < simul.step; ++i)
+  {
     simul.PeriodBoundary();
     simul.UpdateMNHC_VV3();
-    if (!simul.ok) {
-      simul.Dump(out_file);
-      simul.DumpForce(out_file);
-      simul.DumpEnergy(out_file);
-      simul.NormalizeStat();
-      simul.DumpStat(out_file);
+
+    if (!simul.ok)
+    {
+      std::cout << "Simulation failed after " << i << " steps" << std::endl;
       return 0;
     }
+
+    if (i % 1000 == 0)
+      std::cout << "Completed " << i << " steps!" << std::endl;
   }
-  for (i = 0; i < simul.step; ++i) {
-    simul.PeriodBoundary();
-    simul.UpdateMNHC_VV3();
-    if (!simul.ok) {
-      simul.Dump(out_file);
-      simul.DumpForce(out_file);
-      simul.DumpEnergy(out_file);
-      simul.NormalizeStat();
-      simul.DumpStat(out_file);
-      return 0;
-    }
-    simul.MakeStat();
-    if (i % 100000 == 0)
-      out_file << "i=" << i << std::endl;
-  }
-  //simul.Dump(out_file);
-  simul.NormalizeStat();
-  simul.DumpStat(out_file);
+
+  std::cout << "Saving data..." << std::endl;
+
+  simul.Dump(out_file);
+
+  std::cout << "The total energy was calculated to be " << simul.TotalEnergy() << "!" << std::endl;
+
   t = clock() - t;
-  out_file << (int)(((double)1000 * t) / CLOCKS_PER_SEC) << std::endl;
+
+  std::cout << "Simulation finished in " << t / CLOCKS_PER_SEC << " seconds!" << std::endl;
+
   return 0;
 }

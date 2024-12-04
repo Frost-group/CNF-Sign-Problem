@@ -1,2 +1,5 @@
-output.txt
+output_*.txt
 PIMD
+
+*.obj
+*.exe

@@ -1,9 +1,9 @@
-#ifndef PARTICLE_X_HPP
-#define PARTICLE_X_HPP
+#ifndef PARTICLE_HPP
+#define PARTICLE_HPP
 
 #include <limits>
 
-#define D 3
+#define D 2
 #define M 8
 #define kB 1
 #define hBar 1

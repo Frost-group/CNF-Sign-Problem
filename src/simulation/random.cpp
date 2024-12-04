@@ -1,4 +1,9 @@
 #include "random.hpp"
+
+#ifdef _WIN32
+#define _USE_MATH_DEFINES
+#endif
+
 #include <cmath>
 
 static XRandUInt XSeed = 1;
@@ -7,29 +12,36 @@ static XRandUInt XA = 16807;
 static XRandUInt XQ = 127766;
 static XRandUInt XR = 120485;
 
-XRandUInt XRandInteger() {
+XRandUInt XRandInteger()
+{
   int res = (int)(XA * (XSeed % XQ)) - (int)(XR * (XSeed / XQ));
-  if (res < 0) res += XMod;
+  if (res < 0)
+    res += XMod;
   XSeed = res;
   return XSeed;
 }
 
-void XSetRandSeed(XRandUInt seed) {
+void XSetRandSeed(XRandUInt seed)
+{
   XSeed = seed;
 }
 
-XRandUInt XGetRandSeed() {
+XRandUInt XGetRandSeed()
+{
   return XSeed;
 }
 
-XRandF XRandFloat() {
+XRandF XRandFloat()
+{
   return (XRandF)(XRandInteger()) / XMod;
 }
 
-XRandF XRandGauss() {
+XRandF XRandGauss()
+{
   static XRandF first, second;
   static bool has = false;
-  if (has) {
+  if (has)
+  {
     has = false;
     return second;
   }
