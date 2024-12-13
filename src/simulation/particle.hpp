@@ -3,7 +3,7 @@
 
 #include <limits>
 
-#define D 2
+#define D 3
 #define M 8
 #define kB 1
 #define hBar 1

@@ -4,36 +4,22 @@
 #define _USE_MATH_DEFINES
 #endif
 
+#include <iostream>
 #include <cmath>
 
-static XRandUInt XSeed = 1;
-static XRandUInt XMod = 2147483647;
-static XRandUInt XA = 16807;
-static XRandUInt XQ = 127766;
-static XRandUInt XR = 120485;
-
-XRandUInt XRandInteger()
-{
-  int res = (int)(XA * (XSeed % XQ)) - (int)(XR * (XSeed / XQ));
-  if (res < 0)
-    res += XMod;
-  XSeed = res;
-  return XSeed;
-}
+std::uniform_real_distribution<double> generator;
+std::mt19937 algorithm;
 
 void XSetRandSeed(XRandUInt seed)
 {
-  XSeed = seed;
-}
+  algorithm = std::mt19937(seed);
 
-XRandUInt XGetRandSeed()
-{
-  return XSeed;
+  generator = std::uniform_real_distribution<double>(0.0, 1.0);
 }
 
 XRandF XRandFloat()
 {
-  return (XRandF)(XRandInteger()) / XMod;
+  return generator(algorithm);
 }
 
 XRandF XRandGauss()

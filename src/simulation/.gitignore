@@ -1,5 +1,4 @@
-output_*.txt
 PIMD
-
 *.obj
 *.exe
+*.csv

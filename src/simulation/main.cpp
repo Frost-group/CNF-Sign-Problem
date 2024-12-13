@@ -9,7 +9,7 @@ int main(int argc, char *argv[])
   std::ifstream in_file;
   XSimulation simul;
 
-  out_file.open("output_" + std::string(argv[1]) + ".txt");
+  out_file.open("output/" + std::string(argv[1]) + ".csv");
   in_file.open("options.txt");
 
   simul.Initial(in_file, atoi(argv[1]));
