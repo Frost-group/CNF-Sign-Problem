@@ -17,6 +17,7 @@ There are two main structures:
 
 - The `Processing` structure in ```src/processing/main.py``` which contains the transformation analysis software,
 - The `Simulation` structure in ```src/simulation/``` which contains the adjusted path integral simulation code.
+Originally via, https://arxiv.org/abs/2401.00274 , but the version here is the 2nd version from their Github 'PIMD-prov2' https://github.com/xiongyunuo/PIMD-Pro-2
 
 ## Changelog
 
