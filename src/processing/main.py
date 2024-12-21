@@ -7,10 +7,16 @@ import numpy as np
 
 # Simulation parameters
 NETWORK_DEPTH = 64
-TOLERANCE = 1e-3
 BACKFLOWS = 2
 STEP = 1e-3
 FILES = 4
+
+# Tolerances
+MEAN_DEVIATION_TOLERANCE = 1e-3
+LOG_PROBABILITY_TOLERANCE = 3
+
+# Maps for tensor backflow calculations
+BACKFLOW_MAPS = {}
 
 # Load learning data
 
@@ -24,53 +30,88 @@ def loadData():
 
     return tc.tensor(data, requires_grad=False, dtype=tc.float32)
 
+# Build maps to calculate the correlated backflow transformation in a tensor way
+
+
+def buildBackflowMap(data):
+
+    particle_number = int(max(data[:, 1]))
+    bead_number = int(max(data[:, 2]))
+
+    indices = np.indices((data.shape[0], bead_number, 3))
+
+    temperature_map = data[indices[0], 0]
+    sign_map = data[indices[0], 3]
+
+    # Scales neural network map
+    BACKFLOW_MAPS["scales_network"] = (tc.reshape(
+        temperature_map, (data.shape[0] * bead_number * 3, 1)))
+
+    # Strength neural network map
+    BACKFLOW_MAPS["strength_network"] = tc.cat((tc.reshape(
+        sign_map, (data.shape[0] * bead_number * 3, 1)), BACKFLOW_MAPS["scales_network"]), 1)
+
+    # Coordinate summation maps
+    BACKFLOW_MAPS["origin_vector"] = indices[0, :, :, 0]
+
+    coordinate_map = (np.floor(
+        indices[0] / (particle_number * bead_number)) * (particle_number * bead_number)).astype(int)
+    coordinate_map += np.remainder(indices[0], bead_number)
+    coordinate_map += indices[1] * bead_number
+
+    BACKFLOW_MAPS["permutation_vector"] = coordinate_map[:, :, 0]
+
+    filter_map = (coordinate_map != indices[0]).astype(float)
+
+    BACKFLOW_MAPS["self_filter"] = tc.tensor(
+        filter_map, dtype=tc.float32, requires_grad=False)
+
+    BACKFLOW_MAPS["origin_magnitude"] = indices[0]
+
+    BACKFLOW_MAPS["permutation_magnitude"] = coordinate_map
+
+    BACKFLOW_MAPS["zero_probabilities"] = tc.zeros(data.shape[0], bead_number)
+
 # Define the hydrodynamical backflow function
 
 
-def hydrodynamical_backflow_transformation(data, strength_networks, scale_networks, untransformed_coordinates):
+def hydrodynamical_backflow_transformation(strength_networks, scale_networks, untransformed_coordinates):
 
-    coordinates = untransformed_coordinates.clone()
+    coordinates = untransformed_coordinates[BACKFLOW_MAPS["origin_vector"], :]
 
     for n in range(BACKFLOWS):
 
-        for i in range(data.size()[0]):
+        strengths = tc.reshape(strength_networks[n](
+            BACKFLOW_MAPS["strength_network"]), BACKFLOW_MAPS["origin_magnitude"].shape)
+        scales = tc.reshape(scale_networks[n](
+            BACKFLOW_MAPS["scales_network"]), BACKFLOW_MAPS["origin_magnitude"].shape)
 
-            strength = strength_networks[n](data[i, 0:2])
-            scale = scale_networks[n](data[i, 0:1])
+        coordinates += strengths * (untransformed_coordinates[BACKFLOW_MAPS["origin_vector"], :] - untransformed_coordinates[BACKFLOW_MAPS["permutation_vector"], :]) / (1.0 + (
+            (untransformed_coordinates[BACKFLOW_MAPS["origin_magnitude"], :] - untransformed_coordinates[BACKFLOW_MAPS["permutation_magnitude"], :]).norm(dim=3) / scales) ** 3)
 
-            for j in range(i % PARTICLES, BEADS * (PARTICLES - 1) + i % PARTICLES, PARTICLES):
-
-                if not i == j:
-                    coordinates[i] += strength * (untransformed_coordinates[i] - untransformed_coordinates[j]) / (
-                        1.0 + ((untransformed_coordinates[i] - untransformed_coordinates[j]).norm() / scale) ** 3)
-
-    return coordinates
+    return tc.sum(coordinates, 1)
 
 # Define the hydrodynamical backflow log of probability
 
 
-def hydrodynamical_backflow_probability(data, strength_networks, scale_networks, untransformed_coordinates):
+def hydrodynamical_backflow_probability(strength_networks, scale_networks, untransformed_coordinates):
 
-    probability = 0.0
+    probability = BACKFLOW_MAPS["zero_probabilities"].clone()
 
     for n in range(BACKFLOWS):
 
-        for i in range(data.size()[0]):
+        strengths = tc.reshape(strength_networks[n](
+            BACKFLOW_MAPS["strength_network"]), BACKFLOW_MAPS["origin_magnitude"].shape)
+        scales = tc.reshape(scale_networks[n](
+            BACKFLOW_MAPS["scales_network"]), BACKFLOW_MAPS["origin_magnitude"].shape)
 
-            strength = strength_networks[n](data[i, 0:2])
-            scale = scale_networks[n](data[i, 0:1])
+        probability += tc.sum(BACKFLOW_MAPS["self_filter"] * strengths / (1.0 + ((untransformed_coordinates[BACKFLOW_MAPS["origin_magnitude"],
+                              :] - untransformed_coordinates[BACKFLOW_MAPS["permutation_magnitude"], :]).norm(dim=3) / scales) ** 3), 2) / 3.0
 
-            for j in range(i % PARTICLES, BEADS * (PARTICLES - 1) + i % PARTICLES, PARTICLES):
+        probability -= tc.sum(3.0 * strengths * ((untransformed_coordinates[BACKFLOW_MAPS["origin_magnitude"], :] - untransformed_coordinates[BACKFLOW_MAPS["permutation_magnitude"], :]).norm(dim=3) / scales) ** 3 / (
+            1.0 + ((untransformed_coordinates[BACKFLOW_MAPS["origin_magnitude"], :] - untransformed_coordinates[BACKFLOW_MAPS["permutation_magnitude"], :]).norm(dim=3) / scales) ** 3) ** 2, 2) / 3.0
 
-                if not i == j:
-                    probability += strength / \
-                        (1.0 + ((untransformed_coordinates[i] -
-                         untransformed_coordinates[j]).norm() / scale) ** 3)
-
-                    probability -= 3.0 * strength * ((untransformed_coordinates[i] - untransformed_coordinates[j]).norm() / scale) ** 3 / (
-                        1.0 + ((untransformed_coordinates[i] - untransformed_coordinates[j]).norm() / scale) ** 3) ** 2
-
-    return probability
+    return tc.sum(probability, 1)
 
 
 if __name__ == "__main__":
@@ -80,11 +121,8 @@ if __name__ == "__main__":
     # Read distribution data
     data = loadData()
 
-    global PARTICLES
-    global BEADS
-
-    PARTICLES = int(max(data[:, 1]))
-    BEADS = int(max(data[:, 2]))
+    # Build backflow coordinate mapping tensor
+    buildBackflowMap(data)
 
     print("Learning...")
 
@@ -111,15 +149,13 @@ if __name__ == "__main__":
     # Define the minimization function
     def minimization_function():
 
-        distribution_fit_cost = tc.sum(tc.abs(data[:, 4:7] - hydrodynamical_backflow_transformation(
-            data, strength_networks, scale_networks, untransformed_coordinates)))
-        transformation_fit_cost = -tc.sum(hydrodynamical_backflow_probability(
-            data, strength_networks, scale_networks, untransformed_coordinates))
+        distribution_deviations = tc.abs(data[:, 4:7] - hydrodynamical_backflow_transformation(
+            strength_networks, scale_networks, untransformed_coordinates))
+        log_probability = tc.sum(hydrodynamical_backflow_probability(
+            strength_networks, scale_networks, untransformed_coordinates))
 
-        return distribution_fit_cost.item(), transformation_fit_cost.item(), distribution_fit_cost + transformation_fit_cost
+        return tc.mean(distribution_deviations).item(), log_probability.item(), tc.sum(distribution_deviations) - log_probability
 
-    previous_transformation_fit = np.inf
-    previous_distribution_fit = np.inf
     convergence_data = []
     loop = 0
 
@@ -131,7 +167,7 @@ if __name__ == "__main__":
 
     while True:
 
-        distribution_fit, transformation_fit, cost = minimization_function()
+        mean_deviation, log_probability, cost = minimization_function()
 
         optimizer.zero_grad()
 
@@ -143,23 +179,13 @@ if __name__ == "__main__":
 
         loop += 1
 
-        # Check for convergence
-        transformation_fit_change = np.abs(
-            1 - transformation_fit / previous_transformation_fit)
-        distribution_fit_change = np.abs(
-            1 - distribution_fit / previous_distribution_fit)
+        print(f"Maximum coordinate deviation after loop {loop} is {
+              mean_deviation} and the log of the probability is {log_probability}!")
 
-        print(
-            f"Transformation fit change after loop {loop} is {transformation_fit_change} and the distribution fit change is {distribution_fit_change}!")
+        convergence_data.append([loop, mean_deviation, log_probability])
 
-        convergence_data.append(
-            [distribution_fit, transformation_fit])
-
-        if transformation_fit_change < TOLERANCE and distribution_fit_change < TOLERANCE:
+        if mean_deviation < MEAN_DEVIATION_TOLERANCE and log_probability < LOG_PROBABILITY_TOLERANCE:
             break
-
-        previous_transformation_fit = transformation_fit
-        previous_distribution_fit = distribution_fit
 
     # Save data
     np.savetxt("convergence.csv", np.array(convergence_data), delimiter=', ')

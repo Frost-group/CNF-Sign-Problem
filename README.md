@@ -2,7 +2,7 @@
 
 ## Introduction
 
-This a simulation code written as part of my doctoral project for attempting to mitigate the sign problem, present in electron systems. This project was built using C++ 11 and Python 3.13.
+This a simulation code written as part of my doctoral project for attempting to mitigate the sign problem, present in electron systems. This project was built using C++ 11 and Python 3.13. Part of it uses some of the code present in the [PIMD Pro](https://github.com/xiongyunuo/pimd-pro-2) software package.
 
 ## Funcionality
 
@@ -17,7 +17,6 @@ There are two main structures:
 
 - The `Processing` structure in ```src/processing/main.py``` which contains the transformation analysis software,
 - The `Simulation` structure in ```src/simulation/``` which contains the adjusted path integral simulation code.
-Originally via, https://arxiv.org/abs/2401.00274 , but the version here is the 2nd version from their Github 'PIMD-prov2' https://github.com/xiongyunuo/PIMD-Pro-2
 
 ## Changelog
 
