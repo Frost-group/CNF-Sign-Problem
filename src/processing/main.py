@@ -1,3 +1,4 @@
+import scipy.optimize as optimize
 import matplotlib.pyplot as plot
 import torch as tc
 import numpy as np
@@ -12,8 +13,7 @@ STEP = 1e-3
 FILES = 4
 
 # Tolerances
-MEAN_DEVIATION_TOLERANCE = 1e-3
-LOG_PROBABILITY_TOLERANCE = 3
+LOG_PROBABILITY_TOLERANCE = -6
 
 # Maps for tensor backflow calculations
 BACKFLOW_MAPS = {}
@@ -75,7 +75,10 @@ def buildBackflowMap(data):
 # Define the hydrodynamical backflow function
 
 
-def hydrodynamical_backflow_transformation(strength_networks, scale_networks, untransformed_coordinates):
+def hydrodynamical_backflow_transformation(untransformed_coordinates, strength_networks, scale_networks):
+
+    untransformed_coordinates = tc.tensor(untransformed_coordinates, requires_grad=False, dtype=tc.float32).reshape(
+        int(len(untransformed_coordinates) / 3), 3)
 
     coordinates = untransformed_coordinates[BACKFLOW_MAPS["origin_vector"], :]
 
@@ -89,7 +92,7 @@ def hydrodynamical_backflow_transformation(strength_networks, scale_networks, un
         coordinates += strengths * (untransformed_coordinates[BACKFLOW_MAPS["origin_vector"], :] - untransformed_coordinates[BACKFLOW_MAPS["permutation_vector"], :]) / (1.0 + (
             (untransformed_coordinates[BACKFLOW_MAPS["origin_magnitude"], :] - untransformed_coordinates[BACKFLOW_MAPS["permutation_magnitude"], :]).norm(dim=3) / scales) ** 3)
 
-    return tc.sum(coordinates, 1)
+    return tc.sum(coordinates, 1).reshape(untransformed_coordinates.shape[0] * 3).detach().numpy()
 
 # Define the hydrodynamical backflow log of probability
 
@@ -138,23 +141,30 @@ if __name__ == "__main__":
         scale_networks.append(tc.nn.Sequential(tc.nn.Linear(
             1, NETWORK_DEPTH), tc.nn.ReLU(), tc.nn.Linear(NETWORK_DEPTH, 1)))
 
+        SMALL = 1e-3
+
+        strength_networks[i][0].weight.data *= SMALL
+        strength_networks[i][2].weight.data *= SMALL
+        strength_networks[i][0].bias.data *= SMALL
+        strength_networks[i][2].bias.data *= SMALL
+
+        scale_networks[i][0].weight.data *= SMALL
+        scale_networks[i][2].weight.data *= SMALL
+        scale_networks[i][0].bias.data *= SMALL
+        scale_networks[i][2].bias.data *= SMALL
+
         parameters += list(strength_networks[i].parameters())
         parameters += list(scale_networks[i].parameters())
 
-    untransformed_coordinates = data[:,
-                                     4:7].clone().detach().requires_grad_(True)
-
-    parameters.append(untransformed_coordinates)
+    untransformed_coordinates = data[:, 4:7].clone()
 
     # Define the minimization function
-    def minimization_function():
+    def minimisation_function():
 
-        distribution_deviations = tc.abs(data[:, 4:7] - hydrodynamical_backflow_transformation(
-            strength_networks, scale_networks, untransformed_coordinates))
         log_probability = tc.sum(hydrodynamical_backflow_probability(
             strength_networks, scale_networks, untransformed_coordinates))
 
-        return tc.mean(distribution_deviations).item(), log_probability.item(), tc.sum(distribution_deviations) - log_probability
+        return -log_probability
 
     convergence_data = []
     loop = 0
@@ -163,11 +173,13 @@ if __name__ == "__main__":
 
     # Run optimization
 
-    optimizer = tc.optim.Adam(parameters, lr=STEP)
+    optimizer = tc.optim.SGD(parameters, lr=STEP)
 
     while True:
 
-        mean_deviation, log_probability, cost = minimization_function()
+        print("Minimizing probability...")
+
+        cost = minimisation_function()
 
         optimizer.zero_grad()
 
@@ -179,13 +191,18 @@ if __name__ == "__main__":
 
         loop += 1
 
-        print(f"Maximum coordinate deviation after loop {loop} is {
-              mean_deviation} and the log of the probability is {log_probability}!")
+        print(f"The log probability after loop {loop} is {cost.item()}!")
 
-        convergence_data.append([loop, mean_deviation, log_probability])
+        convergence_data.append([loop, cost.item()])
 
-        if mean_deviation < MEAN_DEVIATION_TOLERANCE and log_probability < LOG_PROBABILITY_TOLERANCE:
+        # Check for convergence
+        if cost.item() < LOG_PROBABILITY_TOLERANCE:
             break
+
+        print("Solving for untransformed coordinates...")
+
+        untransformed_coordinates = tc.tensor(optimize.fsolve(hydrodynamical_backflow_transformation, data[:, 4:7].reshape(data.shape[0] * 3).numpy(), args=(
+            strength_networks, scale_networks)), requires_grad=False, dtype=tc.float32).reshape((data.shape[0], 3))
 
     # Save data
     np.savetxt("convergence.csv", np.array(convergence_data), delimiter=', ')
