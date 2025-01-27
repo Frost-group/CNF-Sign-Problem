@@ -7,13 +7,13 @@ import numpy as np
 # tc.set_default_device('cuda')
 
 # Simulation parameters
-NETWORK_DEPTH = 64
+NETWORK_DEPTH = 128
 BACKFLOWS = 2
 STEP = 1e-3
 FILES = 4
 
 # Tolerances
-LOG_PROBABILITY_TOLERANCE = -6
+LOG_PROBABILITY_TOLERANCE = -np.log(1e6)
 
 # Maps for tensor backflow calculations
 BACKFLOW_MAPS = {}
@@ -35,8 +35,13 @@ def loadData():
 
 def buildBackflowMap(data):
 
+    global LOG_PROBABILITY_TOLERANCE
+
     particle_number = int(max(data[:, 1]))
     bead_number = int(max(data[:, 2]))
+
+    # Adjust to number of data points
+    LOG_PROBABILITY_TOLERANCE *= particle_number * bead_number
 
     indices = np.indices((data.shape[0], bead_number, 3))
 
@@ -75,12 +80,12 @@ def buildBackflowMap(data):
 # Define the hydrodynamical backflow function
 
 
-def hydrodynamical_backflow_transformation(untransformed_coordinates, strength_networks, scale_networks):
+def hydrodynamical_backflow_transformation(untransformed_coordinates, strength_networks, scale_networks, bead_number):
 
     untransformed_coordinates = tc.tensor(untransformed_coordinates, requires_grad=False, dtype=tc.float32).reshape(
         int(len(untransformed_coordinates) / 3), 3)
 
-    coordinates = untransformed_coordinates[BACKFLOW_MAPS["origin_vector"], :]
+    coordinates = untransformed_coordinates[BACKFLOW_MAPS["origin_vector"], :] / bead_number
 
     for n in range(BACKFLOWS):
 
@@ -141,30 +146,27 @@ if __name__ == "__main__":
         scale_networks.append(tc.nn.Sequential(tc.nn.Linear(
             1, NETWORK_DEPTH), tc.nn.ReLU(), tc.nn.Linear(NETWORK_DEPTH, 1)))
 
-        SMALL = 1e-3
-
-        strength_networks[i][0].weight.data *= SMALL
-        strength_networks[i][2].weight.data *= SMALL
-        strength_networks[i][0].bias.data *= SMALL
-        strength_networks[i][2].bias.data *= SMALL
-
-        scale_networks[i][0].weight.data *= SMALL
-        scale_networks[i][2].weight.data *= SMALL
-        scale_networks[i][0].bias.data *= SMALL
-        scale_networks[i][2].bias.data *= SMALL
+        strength_networks[i][0].weight.data *= 0.0
+        strength_networks[i][2].weight.data *= 0.0
+        strength_networks[i][0].bias.data *= 0.0
+        strength_networks[i][2].bias.data *= 0.0
 
         parameters += list(strength_networks[i].parameters())
         parameters += list(scale_networks[i].parameters())
 
     untransformed_coordinates = data[:, 4:7].clone()
 
-    # Define the minimization function
-    def minimisation_function():
+    # Define the maximum likelihood minimization function
+    def minimisation_function(untransformed_coordinates):
 
         log_probability = tc.sum(hydrodynamical_backflow_probability(
             strength_networks, scale_networks, untransformed_coordinates))
 
         return -log_probability
+
+    # Define the model and data difference function
+    def data_model_difference(untransformed_coordinates):
+        return data[:, 4:7].reshape(data.shape[0] * 3).numpy() - hydrodynamical_backflow_transformation(untransformed_coordinates, strength_networks, scale_networks, int(max(data[:, 2])))
 
     convergence_data = []
     loop = 0
@@ -179,7 +181,7 @@ if __name__ == "__main__":
 
         print("Minimizing probability...")
 
-        cost = minimisation_function()
+        cost = minimisation_function(untransformed_coordinates)
 
         optimizer.zero_grad()
 
@@ -191,7 +193,8 @@ if __name__ == "__main__":
 
         loop += 1
 
-        print(f"The log probability after loop {loop} is {cost.item()}!")
+        print(
+            f"The log probability after loop {loop} is {cost.item()}! Targeting {LOG_PROBABILITY_TOLERANCE}...")
 
         convergence_data.append([loop, cost.item()])
 
@@ -201,8 +204,8 @@ if __name__ == "__main__":
 
         print("Solving for untransformed coordinates...")
 
-        untransformed_coordinates = tc.tensor(optimize.fsolve(hydrodynamical_backflow_transformation, data[:, 4:7].reshape(data.shape[0] * 3).numpy(), args=(
-            strength_networks, scale_networks)), requires_grad=False, dtype=tc.float32).reshape((data.shape[0], 3))
+        untransformed_coordinates = tc.tensor(optimize.fsolve(data_model_difference, untransformed_coordinates.reshape(
+            data.shape[0] * 3).numpy()), requires_grad=False, dtype=tc.float32).reshape((data.shape[0], 3))
 
     # Save data
     np.savetxt("convergence.csv", np.array(convergence_data), delimiter=', ')
