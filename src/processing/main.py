@@ -8,9 +8,9 @@ import numpy as np
 
 # Simulation parameters
 NETWORK_DEPTH = 128
-BACKFLOWS = 2
+BACKFLOWS = 1
 STEP = 1e-3
-FILES = 4
+FILES = 2
 
 # Tolerances
 LOG_PROBABILITY_TOLERANCE = -np.log(1e6)
@@ -53,8 +53,8 @@ def buildBackflowMap(data):
         temperature_map, (data.shape[0] * bead_number * 3, 1)))
 
     # Strength neural network map
-    BACKFLOW_MAPS["strength_network"] = tc.cat((tc.reshape(
-        sign_map, (data.shape[0] * bead_number * 3, 1)), BACKFLOW_MAPS["scales_network"]), 1)
+    BACKFLOW_MAPS["strength_network"] = tc.abs(tc.cat((tc.reshape(
+        sign_map, (data.shape[0] * bead_number * 3, 1)), BACKFLOW_MAPS["scales_network"]), 1))
 
     # Coordinate summation maps
     BACKFLOW_MAPS["origin_vector"] = indices[0, :, :, 0]
@@ -91,8 +91,8 @@ def hydrodynamical_backflow_transformation(untransformed_coordinates, strength_n
 
         strengths = tc.reshape(strength_networks[n](
             BACKFLOW_MAPS["strength_network"]), BACKFLOW_MAPS["origin_magnitude"].shape)
-        scales = tc.reshape(scale_networks[n](
-            BACKFLOW_MAPS["scales_network"]), BACKFLOW_MAPS["origin_magnitude"].shape)
+        scales = tc.abs(tc.reshape(scale_networks[n](
+            BACKFLOW_MAPS["scales_network"]), BACKFLOW_MAPS["origin_magnitude"].shape))
 
         coordinates += strengths * (untransformed_coordinates[BACKFLOW_MAPS["origin_vector"], :] - untransformed_coordinates[BACKFLOW_MAPS["permutation_vector"], :]) / (1.0 + (
             (untransformed_coordinates[BACKFLOW_MAPS["origin_magnitude"], :] - untransformed_coordinates[BACKFLOW_MAPS["permutation_magnitude"], :]).norm(dim=3) / scales) ** 3)
@@ -110,8 +110,8 @@ def hydrodynamical_backflow_probability(strength_networks, scale_networks, untra
 
         strengths = tc.reshape(strength_networks[n](
             BACKFLOW_MAPS["strength_network"]), BACKFLOW_MAPS["origin_magnitude"].shape)
-        scales = tc.reshape(scale_networks[n](
-            BACKFLOW_MAPS["scales_network"]), BACKFLOW_MAPS["origin_magnitude"].shape)
+        scales = tc.abs(tc.reshape(scale_networks[n](
+            BACKFLOW_MAPS["scales_network"]), BACKFLOW_MAPS["origin_magnitude"].shape))
 
         probability += tc.sum(BACKFLOW_MAPS["self_filter"] * strengths / (1.0 + ((untransformed_coordinates[BACKFLOW_MAPS["origin_magnitude"],
                               :] - untransformed_coordinates[BACKFLOW_MAPS["permutation_magnitude"], :]).norm(dim=3) / scales) ** 3), 2) / 3.0
@@ -146,11 +146,6 @@ if __name__ == "__main__":
         scale_networks.append(tc.nn.Sequential(tc.nn.Linear(
             1, NETWORK_DEPTH), tc.nn.ReLU(), tc.nn.Linear(NETWORK_DEPTH, 1)))
 
-        strength_networks[i][0].weight.data *= 0.0
-        strength_networks[i][2].weight.data *= 0.0
-        strength_networks[i][0].bias.data *= 0.0
-        strength_networks[i][2].bias.data *= 0.0
-
         parameters += list(strength_networks[i].parameters())
         parameters += list(scale_networks[i].parameters())
 
@@ -179,9 +174,18 @@ if __name__ == "__main__":
 
     while True:
 
+        print("Solving for untransformed coordinates...")
+
+        untransformed_coordinates = tc.tensor(optimize.fsolve(data_model_difference, untransformed_coordinates.reshape(
+            data.shape[0] * 3).numpy()), requires_grad=False, dtype=tc.float32).reshape((data.shape[0], 3))
+
         print("Minimizing probability...")
 
         cost = minimisation_function(untransformed_coordinates)
+
+        # Check for convergence
+        if cost.item() < LOG_PROBABILITY_TOLERANCE:
+            break
 
         optimizer.zero_grad()
 
@@ -197,15 +201,6 @@ if __name__ == "__main__":
             f"The log probability after loop {loop} is {cost.item()}! Targeting {LOG_PROBABILITY_TOLERANCE}...")
 
         convergence_data.append([loop, cost.item()])
-
-        # Check for convergence
-        if cost.item() < LOG_PROBABILITY_TOLERANCE:
-            break
-
-        print("Solving for untransformed coordinates...")
-
-        untransformed_coordinates = tc.tensor(optimize.fsolve(data_model_difference, untransformed_coordinates.reshape(
-            data.shape[0] * 3).numpy()), requires_grad=False, dtype=tc.float32).reshape((data.shape[0], 3))
 
     # Save data
     np.savetxt("convergence.csv", np.array(convergence_data), delimiter=', ')
@@ -239,8 +234,8 @@ if __name__ == "__main__":
         X = temperatures
 
         for i in range(X.shape[0]):
-            Y[i] = scale_networks[n](
-                tc.tensor([temperatures[i]], dtype=tc.float32)).item()
+            Y[i] = abs(scale_networks[n](
+                tc.tensor([temperatures[i]], dtype=tc.float32)).item())
 
         plot.plot(X, Y)
 
