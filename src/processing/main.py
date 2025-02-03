@@ -9,11 +9,11 @@ import numpy as np
 # Simulation parameters
 NETWORK_DEPTH = 128
 BACKFLOWS = 1
-STEP = 1e-3
+STEP = 1e-4
 FILES = 2
 
 # Tolerances
-LOG_PROBABILITY_TOLERANCE = -np.log(1e6)
+CONVERGENCE_THRESHOLD = 1e-3
 
 # Maps for tensor backflow calculations
 BACKFLOW_MAPS = {}
@@ -35,13 +35,8 @@ def loadData():
 
 def buildBackflowMap(data):
 
-    global LOG_PROBABILITY_TOLERANCE
-
     particle_number = int(max(data[:, 1]))
     bead_number = int(max(data[:, 2]))
-
-    # Adjust to number of data points
-    LOG_PROBABILITY_TOLERANCE *= particle_number * bead_number
 
     indices = np.indices((data.shape[0], bead_number, 3))
 
@@ -163,6 +158,7 @@ if __name__ == "__main__":
     def data_model_difference(untransformed_coordinates):
         return data[:, 4:7].reshape(data.shape[0] * 3).numpy() - hydrodynamical_backflow_transformation(untransformed_coordinates, strength_networks, scale_networks, int(max(data[:, 2])))
 
+    previous_probability = np.inf
     convergence_data = []
     loop = 0
 
@@ -179,13 +175,25 @@ if __name__ == "__main__":
         untransformed_coordinates = tc.tensor(optimize.fsolve(data_model_difference, untransformed_coordinates.reshape(
             data.shape[0] * 3).numpy()), requires_grad=False, dtype=tc.float32).reshape((data.shape[0], 3))
 
-        print("Minimizing probability...")
+        print("Checking for convergence...")
 
         cost = minimisation_function(untransformed_coordinates)
 
         # Check for convergence
-        if cost.item() < LOG_PROBABILITY_TOLERANCE:
+        relative_change = np.abs(1 - cost.item() / previous_probability)
+
+        print(
+            f"Relative change of probability ({cost.item()}) during loop {loop} is {relative_change}!")
+
+        convergence_data.append([loop, cost.item()])
+
+        if relative_change < CONVERGENCE_THRESHOLD:
             break
+
+        previous_probability = cost.item()
+        loop += 1
+
+        print("Minimizing probability...")
 
         optimizer.zero_grad()
 
@@ -194,13 +202,6 @@ if __name__ == "__main__":
         optimizer.step()
 
         # tc.cuda.empty_cache()
-
-        loop += 1
-
-        print(
-            f"The log probability after loop {loop} is {cost.item()}! Targeting {LOG_PROBABILITY_TOLERANCE}...")
-
-        convergence_data.append([loop, cost.item()])
 
     # Save data
     np.savetxt("convergence.csv", np.array(convergence_data), delimiter=', ')
