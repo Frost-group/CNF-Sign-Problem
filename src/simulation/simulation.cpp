@@ -36,7 +36,7 @@ void XSimulation::Initial(std::istream &in, XNum seed)
       double T0;
       in >> T0;
 
-      T = T0 * XRandFloat();
+      T = T0;
 
       beta2 = 1 / (kB * T);
       beta = 1 / (kB * T);
@@ -130,7 +130,7 @@ void XSimulation::Dump(std::ostream &out)
     {
       int index = Index(l, j);
 
-      out << temperature << ", " << l << ", " << j << ", " << sign.real() << ", " << particles[index].coor[0] << ", " << particles[index].coor[1] << ", " << particles[index].coor[2] << std::endl;
+      out << temperature << ", " << l << ", " << j << ", " << sign.real() << ", " << particles[index].coor[0] << ", " << particles[index].coor[1] << ", " << 0.0 << std::endl;
     }
 }
 

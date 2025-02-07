@@ -9,7 +9,7 @@ import numpy as np
 # Simulation parameters
 NETWORK_DEPTH = 128
 BACKFLOWS = 1
-STEP = 1e-4
+STEP = 1e-3
 FILES = 2
 
 # Tolerances
@@ -38,39 +38,40 @@ def buildBackflowMap(data):
     particle_number = int(max(data[:, 1]))
     bead_number = int(max(data[:, 2]))
 
-    indices = np.indices((data.shape[0], bead_number, 3))
+    indices = np.indices((data.shape[0], particle_number, 3))
 
     temperature_map = data[indices[0], 0]
     sign_map = data[indices[0], 3]
 
-    # Scales neural network map
+    # Store temperatures for quick scales neural network calculation
     BACKFLOW_MAPS["scales_network"] = (tc.reshape(
-        temperature_map, (data.shape[0] * bead_number * 3, 1)))
+        temperature_map, (data.shape[0] * particle_number * 3, 1)))
 
-    # Strength neural network map
-    BACKFLOW_MAPS["strength_network"] = tc.abs(tc.cat((tc.reshape(
-        sign_map, (data.shape[0] * bead_number * 3, 1)), BACKFLOW_MAPS["scales_network"]), 1))
+    # Store temperatures and signs for quick scales neural network calculation
+    BACKFLOW_MAPS["strength_network"] = tc.cat((tc.reshape(
+        sign_map, (data.shape[0] * particle_number * 3, 1)), BACKFLOW_MAPS["scales_network"]), 1)
 
     # Coordinate summation maps
     BACKFLOW_MAPS["origin_vector"] = indices[0, :, :, 0]
+    BACKFLOW_MAPS["origin_magnitude"] = indices[0]
 
+    # Apply backflow between particles of the same simulation and bead index
     coordinate_map = (np.floor(
         indices[0] / (particle_number * bead_number)) * (particle_number * bead_number)).astype(int)
     coordinate_map += np.remainder(indices[0], bead_number)
-    coordinate_map += indices[1] * bead_number
+    coordinate_map += indices[1] * particle_number
 
     BACKFLOW_MAPS["permutation_vector"] = coordinate_map[:, :, 0]
+    BACKFLOW_MAPS["permutation_magnitude"] = coordinate_map
 
+    # Don't allow particle self-interactions
     filter_map = (coordinate_map != indices[0]).astype(float)
 
     BACKFLOW_MAPS["self_filter"] = tc.tensor(
         filter_map, dtype=tc.float32, requires_grad=False)
 
-    BACKFLOW_MAPS["origin_magnitude"] = indices[0]
-
-    BACKFLOW_MAPS["permutation_magnitude"] = coordinate_map
-
-    BACKFLOW_MAPS["zero_probabilities"] = tc.zeros(data.shape[0], bead_number)
+    BACKFLOW_MAPS["zero_probabilities"] = tc.zeros(
+        data.shape[0], particle_number)
 
 # Define the hydrodynamical backflow function
 
@@ -179,15 +180,15 @@ if __name__ == "__main__":
 
         cost = minimisation_function(untransformed_coordinates)
 
-        # Check for convergence
-        relative_change = np.abs(1 - cost.item() / previous_probability)
+        # Save and print learning data, check for convergence
+        relative_change = cost.item() / previous_probability - 1
 
         print(
             f"Relative change of probability ({cost.item()}) during loop {loop} is {relative_change}!")
 
         convergence_data.append([loop, cost.item()])
 
-        if relative_change < CONVERGENCE_THRESHOLD:
+        if np.abs(relative_change) < CONVERGENCE_THRESHOLD:
             break
 
         previous_probability = cost.item()
@@ -208,8 +209,8 @@ if __name__ == "__main__":
 
     # Plot backflow strengths and scales
     for n in range(BACKFLOWS):
-        temperatures = np.linspace(0, 1, 128)
-        signs = np.linspace(0, 1, 128)
+        temperatures = np.linspace(0.75, 1.25, 1024)
+        signs = np.linspace(-1.0, 1.0, 1024)
 
         X, Y = np.meshgrid(temperatures, signs)
         Z = X + Y
@@ -231,7 +232,7 @@ if __name__ == "__main__":
 
         plot.clf()
 
-        Y = tc.zeros(128, dtype=tc.float32)
+        Y = tc.zeros(1024, dtype=tc.float32)
         X = temperatures
 
         for i in range(X.shape[0]):
