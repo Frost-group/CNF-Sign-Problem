@@ -1,5 +1,5 @@
-import scipy.optimize as optimize
 import matplotlib.pyplot as plot
+import xitorch.optimize as xt
 import torch as tc
 import numpy as np
 
@@ -76,12 +76,13 @@ def buildBackflowMap(data):
 # Define the hydrodynamical backflow function
 
 
-def hydrodynamical_backflow_transformation(untransformed_coordinates, strength_networks, scale_networks, bead_number):
+def hydrodynamical_backflow_transformation(untransformed_coordinates, strength_networks, scale_networks, particle_number):
 
-    untransformed_coordinates = tc.tensor(untransformed_coordinates, requires_grad=False, dtype=tc.float32).reshape(
+    untransformed_coordinates = untransformed_coordinates.reshape(
         int(len(untransformed_coordinates) / 3), 3)
 
-    coordinates = untransformed_coordinates[BACKFLOW_MAPS["origin_vector"], :] / bead_number
+    coordinates = untransformed_coordinates[BACKFLOW_MAPS["origin_vector"],
+                                            :] / particle_number
 
     for n in range(BACKFLOWS):
 
@@ -93,7 +94,7 @@ def hydrodynamical_backflow_transformation(untransformed_coordinates, strength_n
         coordinates += strengths * (untransformed_coordinates[BACKFLOW_MAPS["origin_vector"], :] - untransformed_coordinates[BACKFLOW_MAPS["permutation_vector"], :]) / (1.0 + (
             (untransformed_coordinates[BACKFLOW_MAPS["origin_magnitude"], :] - untransformed_coordinates[BACKFLOW_MAPS["permutation_magnitude"], :]).norm(dim=3) / scales) ** 3)
 
-    return tc.sum(coordinates, 1).reshape(untransformed_coordinates.shape[0] * 3).detach().numpy()
+    return tc.sum(coordinates, 1).reshape(untransformed_coordinates.shape[0] * 3)
 
 # Define the hydrodynamical backflow log of probability
 
@@ -157,7 +158,7 @@ if __name__ == "__main__":
 
     # Define the model and data difference function
     def data_model_difference(untransformed_coordinates):
-        return data[:, 4:7].reshape(data.shape[0] * 3).numpy() - hydrodynamical_backflow_transformation(untransformed_coordinates, strength_networks, scale_networks, int(max(data[:, 2])))
+        return data[:, 4:7].reshape(data.shape[0] * 3) - hydrodynamical_backflow_transformation(untransformed_coordinates, strength_networks, scale_networks, int(max(data[:, 1])))
 
     previous_probability = np.inf
     convergence_data = []
@@ -173,8 +174,8 @@ if __name__ == "__main__":
 
         print("Solving for untransformed coordinates...")
 
-        untransformed_coordinates = tc.tensor(optimize.fsolve(data_model_difference, untransformed_coordinates.reshape(
-            data.shape[0] * 3).numpy()), requires_grad=False, dtype=tc.float32).reshape((data.shape[0], 3))
+        untransformed_coordinates = xt.rootfinder(data_model_difference, untransformed_coordinates.reshape(
+            data.shape[0] * 3)).reshape((data.shape[0], 3))
 
         print("Checking for convergence...")
 
