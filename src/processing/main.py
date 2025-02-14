@@ -1,9 +1,8 @@
 import matplotlib.pyplot as plot
-import xitorch.optimize as xt
 import torch as tc
 import numpy as np
 
-
+tc.set_default_dtype(tc.float64)
 # tc.set_default_device('cuda')
 
 # Simulation parameters
@@ -28,7 +27,7 @@ def loadData():
         data = np.vstack((data, np.genfromtxt(
             "src/simulation/output/" + str(i + 2) + ".csv", delimiter=',')))
 
-    return tc.tensor(data, requires_grad=False, dtype=tc.float32)
+    return tc.tensor(data, requires_grad=False)
 
 # Build maps to calculate the correlated backflow transformation in a tensor way
 
@@ -68,7 +67,7 @@ def buildBackflowMap(data):
     filter_map = (coordinate_map != indices[0]).astype(float)
 
     BACKFLOW_MAPS["self_filter"] = tc.tensor(
-        filter_map, dtype=tc.float32, requires_grad=False)
+        filter_map, requires_grad=False)
 
     BACKFLOW_MAPS["zero_probabilities"] = tc.zeros(
         data.shape[0], particle_number)
@@ -77,9 +76,6 @@ def buildBackflowMap(data):
 
 
 def hydrodynamical_backflow_transformation(untransformed_coordinates, strength_networks, scale_networks, particle_number):
-
-    untransformed_coordinates = untransformed_coordinates.reshape(
-        int(len(untransformed_coordinates) / 3), 3)
 
     coordinates = untransformed_coordinates[BACKFLOW_MAPS["origin_vector"],
                                             :] / particle_number
@@ -94,7 +90,7 @@ def hydrodynamical_backflow_transformation(untransformed_coordinates, strength_n
         coordinates += strengths * (untransformed_coordinates[BACKFLOW_MAPS["origin_vector"], :] - untransformed_coordinates[BACKFLOW_MAPS["permutation_vector"], :]) / (1.0 + (
             (untransformed_coordinates[BACKFLOW_MAPS["origin_magnitude"], :] - untransformed_coordinates[BACKFLOW_MAPS["permutation_magnitude"], :]).norm(dim=3) / scales) ** 3)
 
-    return tc.sum(coordinates, 1).reshape(untransformed_coordinates.shape[0] * 3)
+    return tc.sum(coordinates, 1)
 
 # Define the hydrodynamical backflow log of probability
 
@@ -147,70 +143,105 @@ if __name__ == "__main__":
         parameters += list(scale_networks[i].parameters())
 
     untransformed_coordinates = data[:, 4:7].clone()
+    untransformed_coordinates.requires_grad = True
+
+    parameters.append(untransformed_coordinates)
 
     # Define the maximum likelihood minimization function
-    def minimisation_function(untransformed_coordinates):
+    def probability_minimisation(untransformed_coordinates):
 
         log_probability = tc.sum(hydrodynamical_backflow_probability(
             strength_networks, scale_networks, untransformed_coordinates))
 
-        return -log_probability
+        return -log_probability, log_probability.item()
 
     # Define the model and data difference function
     def data_model_difference(untransformed_coordinates):
-        return data[:, 4:7].reshape(data.shape[0] * 3) - hydrodynamical_backflow_transformation(untransformed_coordinates, strength_networks, scale_networks, int(max(data[:, 1])))
 
-    previous_probability = np.inf
+        difference = tc.abs(data[:, 4:7] - hydrodynamical_backflow_transformation(
+            untransformed_coordinates, strength_networks, scale_networks, int(max(data[:, 1]))))
+
+        return tc.max(difference), tc.max(difference).item()
+
+    previous_log_probability = np.inf
     convergence_data = []
     loop = 0
 
     # tc.cuda.empty_cache()
 
-    # Run optimization
+    # Run constrained optimization
 
     optimizer = tc.optim.SGD(parameters, lr=STEP)
 
     while True:
 
-        print("Solving for untransformed coordinates...")
-
-        untransformed_coordinates = xt.rootfinder(data_model_difference, untransformed_coordinates.reshape(
-            data.shape[0] * 3)).reshape((data.shape[0], 3))
-
-        print("Checking for convergence...")
-
-        cost = minimisation_function(untransformed_coordinates)
-
-        # Save and print learning data, check for convergence
-        relative_change = cost.item() / previous_probability - 1
-
-        print(
-            f"Relative change of probability ({cost.item()}) during loop {loop} is {relative_change}!")
-
-        convergence_data.append([loop, cost.item()])
-
-        if np.abs(relative_change) < CONVERGENCE_THRESHOLD:
-            break
-
-        previous_probability = cost.item()
-        loop += 1
-
-        print("Minimizing probability...")
+        print("Enforcing constraint...")
 
         optimizer.zero_grad()
+
+        # Untransformed coordinate constraint with respect to the untransformed coordinates only
+        for parameter in parameters:
+            parameter.requires_grad = False
+
+        parameters[-1].requires_grad = True
+
+        cost, maximum_deviation = data_model_difference(
+            untransformed_coordinates)
 
         cost.backward()
 
         optimizer.step()
 
+        print(
+            f"The maximum coordinate deviation during loop {loop} is {maximum_deviation}!")
+
         # tc.cuda.empty_cache()
+
+        # Probability minimisation with respect to the neural networks only, if the constraint condition has been met
+        if maximum_deviation < CONVERGENCE_THRESHOLD:
+
+            print("Coordinate constraint met! Minimising probability...")
+
+            optimizer.zero_grad()
+
+            for parameter in parameters:
+                parameter.requires_grad = True
+
+            parameters[-1].requires_grad = False
+
+            cost, log_probability = probability_minimisation(
+                untransformed_coordinates)
+
+            cost.backward()
+
+            optimizer.step()
+
+            # tc.cuda.empty_cache()
+
+            print("Checking for total convergence...")
+
+            # Save and print learning data, check for convergence
+            convergence_data.append([loop, log_probability])
+
+            relative_change = log_probability / previous_log_probability - 1.0
+            previous_log_probability = log_probability
+
+            print(
+                f"Relative change of probability ({log_probability}) during loop {loop} is {relative_change}!")
+
+            if np.abs(relative_change) < CONVERGENCE_THRESHOLD:
+                break
+
+        loop += 1
+
+    print("Complete! Saving data...")
 
     # Save data
     np.savetxt("convergence.csv", np.array(convergence_data), delimiter=', ')
 
     # Plot backflow strengths and scales
     for n in range(BACKFLOWS):
-        temperatures = np.linspace(0.75, 1.25, 1024)
+        temperatures = np.linspace(0.8, 1.2, 1024)
         signs = np.linspace(-1.0, 1.0, 1024)
 
         X, Y = np.meshgrid(temperatures, signs)
@@ -219,7 +250,7 @@ if __name__ == "__main__":
         for i in range(X.shape[0]):
             for j in range(X.shape[1]):
                 Z[i, j] = strength_networks[n](
-                    tc.tensor([temperatures[i], signs[j]], dtype=tc.float32)).item()
+                    tc.tensor([temperatures[i], signs[j]])).item()
 
         plot.contourf(X, Y, Z, 20, cmap='magma')
 
@@ -233,12 +264,12 @@ if __name__ == "__main__":
 
         plot.clf()
 
-        Y = tc.zeros(1024, dtype=tc.float32)
+        Y = tc.zeros(1024)
         X = temperatures
 
         for i in range(X.shape[0]):
             Y[i] = abs(scale_networks[n](
-                tc.tensor([temperatures[i]], dtype=tc.float32)).item())
+                tc.tensor([temperatures[i]])).item())
 
         plot.plot(X, Y)
 
