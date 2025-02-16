@@ -8,8 +8,8 @@ tc.set_default_dtype(tc.float64)
 # Simulation parameters
 NETWORK_DEPTH = 128
 BACKFLOWS = 1
-STEP = 1e-3
-FILES = 2
+STEP = 1e-4
+FILES = 128
 
 # Tolerances
 CONVERGENCE_THRESHOLD = 1e-3
@@ -161,7 +161,7 @@ if __name__ == "__main__":
         difference = tc.abs(data[:, 4:7] - hydrodynamical_backflow_transformation(
             untransformed_coordinates, strength_networks, scale_networks, int(max(data[:, 1]))))
 
-        return tc.max(difference), tc.max(difference).item()
+        return tc.mean(difference) / tc.mean(data[:, 4:7]), tc.mean(difference).item() / tc.mean(data[:, 4:7]).item()
 
     previous_log_probability = np.inf
     convergence_data = []
@@ -171,7 +171,7 @@ if __name__ == "__main__":
 
     # Run constrained optimization
 
-    optimizer = tc.optim.SGD(parameters, lr=STEP)
+    optimizer = tc.optim.AdamW(parameters, lr=STEP)
 
     while True:
 
@@ -185,7 +185,7 @@ if __name__ == "__main__":
 
         parameters[-1].requires_grad = True
 
-        cost, maximum_deviation = data_model_difference(
+        cost, average_deviation = data_model_difference(
             untransformed_coordinates)
 
         cost.backward()
@@ -193,12 +193,12 @@ if __name__ == "__main__":
         optimizer.step()
 
         print(
-            f"The maximum coordinate deviation during loop {loop} is {maximum_deviation}!")
+            f"The average coordinate deviation during loop {loop} is {average_deviation}!")
 
         # tc.cuda.empty_cache()
 
         # Probability minimisation with respect to the neural networks only, if the constraint condition has been met
-        if maximum_deviation < CONVERGENCE_THRESHOLD:
+        if average_deviation < CONVERGENCE_THRESHOLD:
 
             print("Coordinate constraint met! Minimising probability...")
 
@@ -264,7 +264,7 @@ if __name__ == "__main__":
 
         plot.clf()
 
-        Y = tc.zeros(1024)
+        Y = np.zeros(1024)
         X = temperatures
 
         for i in range(X.shape[0]):
