@@ -6,7 +6,8 @@ tc.set_default_dtype(tc.float64)
 # tc.set_default_device('cuda')
 
 # Simulation parameters
-NETWORK_DEPTH = 128
+NETWORK_NEURONS = 8
+NETWORK_LAYERS = 1
 BACKFLOWS = 1
 STEP = 1e-4
 FILES = 128
@@ -134,10 +135,21 @@ if __name__ == "__main__":
     scale_networks = []
 
     for i in range(BACKFLOWS):
-        strength_networks.append(tc.nn.Sequential(tc.nn.Linear(
-            2, NETWORK_DEPTH), tc.nn.ReLU(), tc.nn.Linear(NETWORK_DEPTH, 1)))
-        scale_networks.append(tc.nn.Sequential(tc.nn.Linear(
-            1, NETWORK_DEPTH), tc.nn.ReLU(), tc.nn.Linear(NETWORK_DEPTH, 1)))
+
+        strength_network = [tc.nn.Linear(2, NETWORK_NEURONS)]
+        scale_network = [tc.nn.Linear(1, NETWORK_NEURONS)]
+
+        for layer in range(NETWORK_LAYERS):
+            strength_network.extend(
+                [tc.nn.Linear(NETWORK_NEURONS, NETWORK_NEURONS), tc.nn.Tanh()])
+            scale_network.extend(
+                [tc.nn.Linear(NETWORK_NEURONS, NETWORK_NEURONS), tc.nn.Tanh()])
+
+        strength_network.append(tc.nn.Linear(NETWORK_NEURONS, 1))
+        scale_network.append(tc.nn.Linear(NETWORK_NEURONS, 1))
+
+        strength_networks.append(tc.nn.Sequential(*strength_network))
+        scale_networks.append(tc.nn.Sequential(*scale_network))
 
         parameters += list(strength_networks[i].parameters())
         parameters += list(scale_networks[i].parameters())
