@@ -1,19 +1,22 @@
 import matplotlib.pyplot as plot
 import torch as tc
 import numpy as np
+import os.path
 
 tc.set_default_dtype(tc.float64)
 # tc.set_default_device('cuda')
+tc.manual_seed(0)
+
 
 # Simulation parameters
 NETWORK_NEURONS = 8
-NETWORK_LAYERS = 1
+NETWORK_LAYERS = 2
 BACKFLOWS = 1
-STEP = 1e-4
+STEP = 0.5e-4
 FILES = 128
 
 # Tolerances
-CONVERGENCE_THRESHOLD = 1e-3
+CONVERGENCE_THRESHOLD = 1e-6
 
 # Maps for tensor backflow calculations
 BACKFLOW_MAPS = {}
@@ -136,17 +139,17 @@ if __name__ == "__main__":
 
     for i in range(BACKFLOWS):
 
-        strength_network = [tc.nn.Linear(2, NETWORK_NEURONS)]
-        scale_network = [tc.nn.Linear(1, NETWORK_NEURONS)]
+        strength_network = [tc.nn.Linear(2, NETWORK_NEURONS, bias=False)]
+        scale_network = [tc.nn.Linear(1, NETWORK_NEURONS, bias=False)]
 
         for layer in range(NETWORK_LAYERS):
             strength_network.extend(
-                [tc.nn.Linear(NETWORK_NEURONS, NETWORK_NEURONS), tc.nn.Tanh()])
+                [tc.nn.Linear(NETWORK_NEURONS, NETWORK_NEURONS, bias=False), tc.nn.Tanh()])
             scale_network.extend(
-                [tc.nn.Linear(NETWORK_NEURONS, NETWORK_NEURONS), tc.nn.Tanh()])
+                [tc.nn.Linear(NETWORK_NEURONS, NETWORK_NEURONS, bias=False), tc.nn.Tanh()])
 
-        strength_network.append(tc.nn.Linear(NETWORK_NEURONS, 1))
-        scale_network.append(tc.nn.Linear(NETWORK_NEURONS, 1))
+        strength_network.append(tc.nn.Linear(NETWORK_NEURONS, 1, bias=False))
+        scale_network.append(tc.nn.Linear(NETWORK_NEURONS, 1, bias=False))
 
         strength_networks.append(tc.nn.Sequential(*strength_network))
         scale_networks.append(tc.nn.Sequential(*scale_network))
@@ -181,11 +184,10 @@ if __name__ == "__main__":
 
     # tc.cuda.empty_cache()
 
-    # Run constrained optimization
-
     optimizer = tc.optim.AdamW(parameters, lr=STEP)
 
-    while True:
+    # Run constrained optimization with a kill switch
+    while True and not os.path.isfile(".end"):
 
         print("Enforcing constraint...")
 
@@ -235,6 +237,10 @@ if __name__ == "__main__":
             # Save and print learning data, check for convergence
             convergence_data.append([loop, log_probability])
 
+            # Save data
+            np.savetxt("convergence.csv", np.array(
+                convergence_data), delimiter=', ')
+
             relative_change = log_probability / previous_log_probability - 1.0
             previous_log_probability = log_probability
 
@@ -253,30 +259,25 @@ if __name__ == "__main__":
 
     # Plot backflow strengths and scales
     for n in range(BACKFLOWS):
-        temperatures = np.linspace(0.8, 1.2, 1024)
-        signs = np.linspace(-1.0, 1.0, 1024)
+        temperatures = np.linspace(0.8, 1.2, 128)
+        signs = np.linspace(-1.0, 1.0, 128)
 
-        X, Y = np.meshgrid(temperatures, signs)
-        Z = X + Y
+        Y = np.zeros(128)
+        X = signs
 
         for i in range(X.shape[0]):
-            for j in range(X.shape[1]):
-                Z[i, j] = strength_networks[n](
-                    tc.tensor([temperatures[i], signs[j]])).item()
+            Y[i] = strength_networks[n](tc.tensor([signs[i], 1.0])).item()
 
-        plot.contourf(X, Y, Z, 20, cmap='magma')
+        plot.plot(X, Y)
 
-        bar = plot.colorbar()
-        bar.set_label('Backflow Strength')
-
-        plot.xlabel("Temperature")
-        plot.ylabel("Sign Value")
+        plot.xlabel("Sign Value")
+        plot.ylabel("Backflow Strength")
 
         plot.savefig('strength_' + str(n) + '.png', dpi=300)
 
         plot.clf()
 
-        Y = np.zeros(1024)
+        Y = np.zeros(128)
         X = temperatures
 
         for i in range(X.shape[0]):
