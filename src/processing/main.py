@@ -12,14 +12,17 @@ tc.manual_seed(0)
 NETWORK_NEURONS = 8
 NETWORK_LAYERS = 2
 BACKFLOWS = 1
-STEP = 0.5e-4
+STEP = 1e-3
 FILES = 128
 
 # Tolerances
-CONVERGENCE_THRESHOLD = 1e-6
+CONVERGENCE_THRESHOLD = 1e-3
 
 # Maps for tensor backflow calculations
 BACKFLOW_MAPS = {}
+
+# Network snapshot indexing
+SNAPSHOT_INDEX = 0
 
 # Load learning data
 
@@ -118,6 +121,52 @@ def hydrodynamical_backflow_probability(strength_networks, scale_networks, untra
 
     return tc.sum(probability, 1)
 
+# Plot backflow strength and scale network snapshot
+
+
+def snapshotNetworks(strength_networks, scale_networks):
+
+    global SNAPSHOT_INDEX
+
+    for n in range(BACKFLOWS):
+        temperatures = np.linspace(0.8, 1.2, 128)
+        signs = np.linspace(-1.0, 1.0, 128)
+
+        Y = np.zeros(128)
+        X = signs
+
+        for i in range(X.shape[0]):
+            Y[i] = strength_networks[n](tc.tensor([signs[i], 1.0])).item()
+
+        plot.plot(X, Y)
+
+        plot.xlabel("Sign Value")
+        plot.ylabel("Backflow Strength")
+
+        plot.savefig('src/processing/output/strength_' + str(n) + '_' +
+                     str(SNAPSHOT_INDEX) + '.png', dpi=300)
+
+        plot.clf()
+
+        Y = np.zeros(128)
+        X = temperatures
+
+        for i in range(X.shape[0]):
+            Y[i] = abs(scale_networks[n](
+                tc.tensor([temperatures[i]])).item())
+
+        plot.plot(X, Y)
+
+        plot.xlabel("Temperature")
+        plot.ylabel("Length Scale")
+
+        plot.savefig('src/processing/output/length_' + str(n) + '_' +
+                     str(SNAPSHOT_INDEX) + '.png', dpi=300)
+
+        plot.clf()
+
+        SNAPSHOT_INDEX += 1
+
 
 if __name__ == "__main__":
 
@@ -125,6 +174,11 @@ if __name__ == "__main__":
 
     # Read distribution data
     data = loadData()
+
+    print(
+        f"Calculated average sign of {tc.mean(data[:, 3]).item()} with a standard deviation of {tc.std(data[:, 3]).item()}!")
+    
+    exit()
 
     # Build backflow coordinate mapping tensor
     buildBackflowMap(data)
@@ -176,8 +230,9 @@ if __name__ == "__main__":
         difference = tc.abs(data[:, 4:7] - hydrodynamical_backflow_transformation(
             untransformed_coordinates, strength_networks, scale_networks, int(max(data[:, 1]))))
 
-        return tc.mean(difference) / tc.mean(data[:, 4:7]), tc.mean(difference).item() / tc.mean(data[:, 4:7]).item()
+        return tc.mean(difference), tc.mean(difference).item()
 
+    previous_average_deviation = np.inf
     previous_log_probability = np.inf
     convergence_data = []
     loop = 0
@@ -189,7 +244,7 @@ if __name__ == "__main__":
     # Run constrained optimization with a kill switch
     while True and not os.path.isfile(".end"):
 
-        print("Enforcing constraint...")
+        print(f"Running loop {loop}...")
 
         optimizer.zero_grad()
 
@@ -202,19 +257,20 @@ if __name__ == "__main__":
         cost, average_deviation = data_model_difference(
             untransformed_coordinates)
 
+        relative_change = average_deviation / previous_average_deviation - 1.0
+        previous_average_deviation = average_deviation
+
         cost.backward()
 
         optimizer.step()
 
         print(
-            f"The average coordinate deviation during loop {loop} is {average_deviation}!")
+            f"Enforcing constraint! The average coordinate deviation ({average_deviation}) change is {relative_change}!")
 
         # tc.cuda.empty_cache()
 
         # Probability minimisation with respect to the neural networks only, if the constraint condition has been met
-        if average_deviation < CONVERGENCE_THRESHOLD:
-
-            print("Coordinate constraint met! Minimising probability...")
+        if np.abs(relative_change) < CONVERGENCE_THRESHOLD:
 
             optimizer.zero_grad()
 
@@ -232,20 +288,17 @@ if __name__ == "__main__":
 
             # tc.cuda.empty_cache()
 
-            print("Checking for total convergence...")
+            # Snapshot the networks
+            snapshotNetworks(strength_networks, scale_networks)
 
-            # Save and print learning data, check for convergence
-            convergence_data.append([loop, log_probability])
-
-            # Save data
-            np.savetxt("convergence.csv", np.array(
-                convergence_data), delimiter=', ')
-
+            # Check for convergence
             relative_change = log_probability / previous_log_probability - 1.0
             previous_log_probability = log_probability
 
+            convergence_data.append([loop, log_probability])
+
             print(
-                f"Relative change of probability ({log_probability}) during loop {loop} is {relative_change}!")
+                f"Coordinate constraint optimised! Relative change of probability ({log_probability}) is {relative_change}!")
 
             if np.abs(relative_change) < CONVERGENCE_THRESHOLD:
                 break
@@ -255,40 +308,5 @@ if __name__ == "__main__":
     print("Complete! Saving data...")
 
     # Save data
-    np.savetxt("convergence.csv", np.array(convergence_data), delimiter=', ')
-
-    # Plot backflow strengths and scales
-    for n in range(BACKFLOWS):
-        temperatures = np.linspace(0.8, 1.2, 128)
-        signs = np.linspace(-1.0, 1.0, 128)
-
-        Y = np.zeros(128)
-        X = signs
-
-        for i in range(X.shape[0]):
-            Y[i] = strength_networks[n](tc.tensor([signs[i], 1.0])).item()
-
-        plot.plot(X, Y)
-
-        plot.xlabel("Sign Value")
-        plot.ylabel("Backflow Strength")
-
-        plot.savefig('strength_' + str(n) + '.png', dpi=300)
-
-        plot.clf()
-
-        Y = np.zeros(128)
-        X = temperatures
-
-        for i in range(X.shape[0]):
-            Y[i] = abs(scale_networks[n](
-                tc.tensor([temperatures[i]])).item())
-
-        plot.plot(X, Y)
-
-        plot.xlabel("Temperature")
-        plot.ylabel("Length Scale")
-
-        plot.savefig('length_' + str(n) + '.png', dpi=300)
-
-        plot.clf()
+    np.savetxt("src/processing/output/convergence.csv",
+               np.array(convergence_data), delimiter=', ')

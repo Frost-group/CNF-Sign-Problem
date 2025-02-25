@@ -67,6 +67,8 @@ public:
   XNum Partition();
   std::complex<double> Partition2();
   ~XSimulation();
+
+  XNum *getBackflowCoordinates(XParticle *particle);
 };
 
 XNum XSimulation::MinimumImage1(XNum a)
