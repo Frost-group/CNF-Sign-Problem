@@ -3,28 +3,27 @@
 
 XNum XSimulation::Distance(XParticle *p1, XParticle *p2)
 {
-  XNum *transformed_p1_coor = getBackflowCoordinates(p1);
-  XNum *transformed_p2_coor = getBackflowCoordinates(p2);
+  XNum *p1_shift = getBackflowShift(p1);
+  XNum *p2_shift = getBackflowShift(p2);
 
   XNum res = 0;
   int i;
   for (i = 0; i < D; ++i)
   {
-    XNum a = transformed_p1_coor[i] - transformed_p2_coor[i];
+    XNum a = MinimumImage1(p1->coor[i] - p2->coor[i]) + (p1_shift[i] - p2_shift[i]);
     res += a * a;
   }
-
   return res;
 }
 
 void XSimulation::RelativeDistance(XParticle *p1, XParticle *p2, XNum *displace)
 {
-  XNum *transformed_p1_coor = getBackflowCoordinates(p1);
-  XNum *transformed_p2_coor = getBackflowCoordinates(p2);
+  XNum *p1_shift = getBackflowShift(p1);
+  XNum *p2_shift = getBackflowShift(p2);
 
   int i;
   for (i = 0; i < D; ++i)
-    displace[i] = transformed_p1_coor[i] - transformed_p2_coor[i];
+    displace[i] = MinimumImage2(p1->coor[i] - p2->coor[i]) + (p1_shift[i] - p2_shift[i]);
 }
 
 void XSimulation::Initial(std::istream &in, XNum seed)
@@ -692,19 +691,23 @@ std::complex<double> XSimulation::Partition2()
   return -beta * res;
 }
 
-// Apply backflow transformation
+// Calculate the backflow shift
 #define BACKFLOWS 1
 
 const XNum strengths[BACKFLOWS] = {0.0};
 const XNum scales[BACKFLOWS] = {1.0};
 
-XNum *XSimulation::getBackflowCoordinates(XParticle *particle)
+XNum *XSimulation::getBackflowShift(XParticle *particle)
 {
-  XNum *transformed_coordinates = new XNum[D];
+  XNum *shift = new XNum[D];
 
   int dimension;
   for (dimension = 0; dimension < D; ++dimension)
-    transformed_coordinates[dimension] = MinimumImage1(particle->coor[dimension]);
+    shift[dimension] = 0.0;
+
+  // Make no backflow simulations more efficient
+  if (BACKFLOWS == 1 && strengths[0] == 0.0)
+    return shift;
 
   // Only allow backflows to apply at the same imaginary time step
   int particle_index;
@@ -724,8 +727,8 @@ XNum *XSimulation::getBackflowCoordinates(XParticle *particle)
     int backflow;
     for (backflow = 0; backflow < BACKFLOWS; ++backflow)
       for (dimension = 0; dimension < D; ++dimension)
-        transformed_coordinates[dimension] += MinimumImage2(particle->coor[dimension] - other_particle.coor[dimension]) * strengths[backflow] / (1.0 + pow(distance / scales[backflow], 3));
+        shift[dimension] += MinimumImage2(particle->coor[dimension] - other_particle.coor[dimension]) * strengths[backflow] / (1.0 + pow(distance / scales[backflow], 3));
   }
 
-  return transformed_coordinates;
+  return shift;
 }

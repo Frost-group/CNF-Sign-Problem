@@ -16,7 +16,7 @@ STEP = 1e-3
 FILES = 128
 
 # Tolerances
-CONVERGENCE_THRESHOLD = 1e-3
+CONVERGENCE_THRESHOLD = 1e-5
 
 # Maps for tensor backflow calculations
 BACKFLOW_MAPS = {}
@@ -177,8 +177,6 @@ if __name__ == "__main__":
 
     print(
         f"Calculated average sign of {tc.mean(data[:, 3]).item()} with a standard deviation of {tc.std(data[:, 3]).item()}!")
-    
-    exit()
 
     # Build backflow coordinate mapping tensor
     buildBackflowMap(data)
@@ -250,7 +248,7 @@ if __name__ == "__main__":
 
         # Untransformed coordinate constraint with respect to the untransformed coordinates only
         for parameter in parameters:
-            parameter.requires_grad = False
+            parameter.requires_grad = True
 
         parameters[-1].requires_grad = True
 
