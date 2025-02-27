@@ -12,8 +12,8 @@ tc.manual_seed(0)
 NETWORK_NEURONS = 8
 NETWORK_LAYERS = 2
 BACKFLOWS = 1
-STEP = 1e-3
-FILES = 128
+FILES = 8192
+STEP = 1e-4
 
 # Tolerances
 CONVERGENCE_THRESHOLD = 1e-5
@@ -31,8 +31,10 @@ def loadData():
     data = np.genfromtxt("src/simulation/output/1.csv", delimiter=',')
 
     for i in range(FILES - 1):
-        data = np.vstack((data, np.genfromtxt(
-            "src/simulation/output/" + str(i + 2) + ".csv", delimiter=',')))
+        if os.path.getsize(
+                "src/simulation/output/" + str(i + 2) + ".csv"):
+            data = np.vstack((data, np.genfromtxt(
+                "src/simulation/output/" + str(i + 2) + ".csv", delimiter=',')))
 
     return tc.tensor(data, requires_grad=False)
 

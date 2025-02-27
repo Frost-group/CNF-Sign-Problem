@@ -8,8 +8,8 @@ This a simulation code written as part of my doctoral project for attempting to 
 
 The current funcionality includes:
 
-- Maximisation of the average sign via an applied data tranformation using a continous normalizing flows implementation,
-- Generation of exact input data from an adjusted existing stochastic ring polymer path integral simulation code.
+- Calculation of the average sign dependence on an inferred backflow transformation via maximum likelihood estimation of simulation data using continous normalizing flows,
+- Generation of exact input and backflow tranformation resulting data from an adjusted existing stochastic ring polymer path integral simulation code.
 
 ## Structure
 
@@ -20,4 +20,9 @@ There are two main structures:
 
 ## Changelog
 
-This program is in development and hasn't had any releases.
+This program has had the following releases:
+
+
+### 1.0 Stable - 27th of February 2025
+
+- Initial release of the software.

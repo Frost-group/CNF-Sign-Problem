@@ -13,6 +13,10 @@ XNum XSimulation::Distance(XParticle *p1, XParticle *p2)
     XNum a = MinimumImage1(p1->coor[i] - p2->coor[i]) + (p1_shift[i] - p2_shift[i]);
     res += a * a;
   }
+
+  delete[] p1_shift;
+  delete[] p2_shift;
+
   return res;
 }
 
@@ -24,6 +28,9 @@ void XSimulation::RelativeDistance(XParticle *p1, XParticle *p2, XNum *displace)
   int i;
   for (i = 0; i < D; ++i)
     displace[i] = MinimumImage2(p1->coor[i] - p2->coor[i]) + (p1_shift[i] - p2_shift[i]);
+
+  delete[] p1_shift;
+  delete[] p2_shift;
 }
 
 void XSimulation::Initial(std::istream &in, XNum seed)
