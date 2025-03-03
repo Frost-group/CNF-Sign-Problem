@@ -1,4 +1,5 @@
 import matplotlib.pyplot as plot
+import pickle as pl
 import torch as tc
 import numpy as np
 import os.path
@@ -9,11 +10,11 @@ tc.manual_seed(0)
 
 
 # Simulation parameters
-NETWORK_NEURONS = 8
-NETWORK_LAYERS = 2
+NETWORK_NEURONS = 4
+NETWORK_LAYERS = 1
 BACKFLOWS = 1
-FILES = 8192
-STEP = 1e-4
+STEP = 1e-3
+FILES = 16
 
 # Tolerances
 CONVERGENCE_THRESHOLD = 1e-5
@@ -145,8 +146,8 @@ def snapshotNetworks(strength_networks, scale_networks):
         plot.xlabel("Sign Value")
         plot.ylabel("Backflow Strength")
 
-        plot.savefig('src/processing/output/strength_' + str(n) + '_' +
-                     str(SNAPSHOT_INDEX) + '.png', dpi=300)
+        plot.savefig(
+            f'src/processing/output/strength_{SNAPSHOT_INDEX:09d}.png', dpi=300)
 
         plot.clf()
 
@@ -162,8 +163,8 @@ def snapshotNetworks(strength_networks, scale_networks):
         plot.xlabel("Temperature")
         plot.ylabel("Length Scale")
 
-        plot.savefig('src/processing/output/length_' + str(n) + '_' +
-                     str(SNAPSHOT_INDEX) + '.png', dpi=300)
+        plot.savefig(
+            f'src/processing/output/length_{SNAPSHOT_INDEX:09d}.png', dpi=300)
 
         plot.clf()
 
@@ -183,36 +184,42 @@ if __name__ == "__main__":
     # Build backflow coordinate mapping tensor
     buildBackflowMap(data)
 
-    print("Learning...")
+    # Check if there is an initial guess present, otherwise setup everything
+    if os.path.isfile("src/processing/parameters.bin"):
+        strength_networks, scale_networks, untransformed_coordinates = pl.load(
+            open('src/processing/parameters.bin', 'rb'))
+    else:
+        untransformed_coordinates = data[:, 4:7].clone()
+        untransformed_coordinates.requires_grad = True
 
+        strength_networks = []
+        scale_networks = []
+
+        # Define the neural networks parameterizing the backflow functions
+        for i in range(BACKFLOWS):
+
+            strength_network = [tc.nn.Linear(2, NETWORK_NEURONS, bias=False)]
+            scale_network = [tc.nn.Linear(1, NETWORK_NEURONS, bias=False)]
+
+            for layer in range(NETWORK_LAYERS):
+                strength_network.extend(
+                    [tc.nn.Linear(NETWORK_NEURONS, NETWORK_NEURONS, bias=False), tc.nn.Tanh()])
+                scale_network.extend(
+                    [tc.nn.Linear(NETWORK_NEURONS, NETWORK_NEURONS, bias=False), tc.nn.Tanh()])
+
+            strength_network.append(tc.nn.Linear(
+                NETWORK_NEURONS, 1, bias=False))
+            scale_network.append(tc.nn.Linear(NETWORK_NEURONS, 1, bias=False))
+
+            strength_networks.append(tc.nn.Sequential(*strength_network))
+            scale_networks.append(tc.nn.Sequential(*scale_network))
+
+    # Compress the learnable parameters for the optimiser
     parameters = []
 
-    # Define the neural networks parameterizing the backflow functions
-    strength_networks = []
-    scale_networks = []
-
     for i in range(BACKFLOWS):
-
-        strength_network = [tc.nn.Linear(2, NETWORK_NEURONS, bias=False)]
-        scale_network = [tc.nn.Linear(1, NETWORK_NEURONS, bias=False)]
-
-        for layer in range(NETWORK_LAYERS):
-            strength_network.extend(
-                [tc.nn.Linear(NETWORK_NEURONS, NETWORK_NEURONS, bias=False), tc.nn.Tanh()])
-            scale_network.extend(
-                [tc.nn.Linear(NETWORK_NEURONS, NETWORK_NEURONS, bias=False), tc.nn.Tanh()])
-
-        strength_network.append(tc.nn.Linear(NETWORK_NEURONS, 1, bias=False))
-        scale_network.append(tc.nn.Linear(NETWORK_NEURONS, 1, bias=False))
-
-        strength_networks.append(tc.nn.Sequential(*strength_network))
-        scale_networks.append(tc.nn.Sequential(*scale_network))
-
         parameters += list(strength_networks[i].parameters())
         parameters += list(scale_networks[i].parameters())
-
-    untransformed_coordinates = data[:, 4:7].clone()
-    untransformed_coordinates.requires_grad = True
 
     parameters.append(untransformed_coordinates)
 
@@ -241,8 +248,10 @@ if __name__ == "__main__":
 
     optimizer = tc.optim.AdamW(parameters, lr=STEP)
 
+    print("Learning...")
+
     # Run constrained optimization with a kill switch
-    while True and not os.path.isfile(".end"):
+    while True and not os.path.isfile("end"):
 
         print(f"Running loop {loop}...")
 
@@ -297,6 +306,10 @@ if __name__ == "__main__":
 
             convergence_data.append([loop, log_probability])
 
+            # Save data
+            np.savetxt("src/processing/output/convergence.csv",
+                       np.array(convergence_data), delimiter=', ')
+
             print(
                 f"Coordinate constraint optimised! Relative change of probability ({log_probability}) is {relative_change}!")
 
@@ -308,5 +321,9 @@ if __name__ == "__main__":
     print("Complete! Saving data...")
 
     # Save data
-    np.savetxt("src/processing/output/convergence.csv",
+    np.savetxt('src/processing/output/convergence.csv',
                np.array(convergence_data), delimiter=', ')
+
+    # Pickle the networks
+    pl.dump([strength_networks, scale_networks, untransformed_coordinates], open(
+        'src/processing/output/parameters.bin', 'ab'))
