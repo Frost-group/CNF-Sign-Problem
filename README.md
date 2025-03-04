@@ -11,6 +11,12 @@ The current funcionality includes:
 - Calculation of the average sign dependence on an inferred backflow transformation via maximum likelihood estimation of simulation data using continous normalizing flows,
 - Generation of exact input and backflow tranformation resulting data from an adjusted existing stochastic ring polymer path integral simulation code.
 
+The resulting image files are labelled specifically to be compiled into a movie using the [ffmpeg](https://ffmpeg.org/ffmpeg.html) package via:
+
+```
+ffmpeg -f image2 -r 60 -pattern_type glob -i 'src/processing/output/strength_*.png' -vcodec libx264 -pix_fmt yuv420p strengths.mp4
+```
+
 ## Structure
 
 There are two main structures:

@@ -133,7 +133,7 @@ def snapshotNetworks(strength_networks, scale_networks):
 
     for n in range(BACKFLOWS):
         temperatures = np.linspace(0.8, 1.2, 128)
-        signs = np.linspace(-1.0, 1.0, 128)
+        signs = np.linspace(0.0, 1.0, 128)
 
         Y = np.zeros(128)
         X = signs
@@ -186,11 +186,9 @@ if __name__ == "__main__":
 
     # Check if there is an initial guess present, otherwise setup everything
     if os.path.isfile("src/processing/parameters.bin"):
-        strength_networks, scale_networks, untransformed_coordinates = pl.load(
+        strength_networks, scale_networks = pl.load(
             open('src/processing/parameters.bin', 'rb'))
     else:
-        untransformed_coordinates = data[:, 4:7].clone()
-        untransformed_coordinates.requires_grad = True
 
         strength_networks = []
         scale_networks = []
@@ -213,6 +211,10 @@ if __name__ == "__main__":
 
             strength_networks.append(tc.nn.Sequential(*strength_network))
             scale_networks.append(tc.nn.Sequential(*scale_network))
+
+    # Use the untransformed cooridnates as the initial guess
+    untransformed_coordinates = data[:, 4:7].clone()
+    untransformed_coordinates.requires_grad = True
 
     # Compress the learnable parameters for the optimiser
     parameters = []
@@ -325,5 +327,5 @@ if __name__ == "__main__":
                np.array(convergence_data), delimiter=', ')
 
     # Pickle the networks
-    pl.dump([strength_networks, scale_networks, untransformed_coordinates], open(
+    pl.dump([strength_networks, scale_networks], open(
         'src/processing/output/parameters.bin', 'ab'))
