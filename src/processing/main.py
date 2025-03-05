@@ -146,6 +146,11 @@ def snapshotNetworks(strength_networks, scale_networks):
         plot.xlabel("Sign Value")
         plot.ylabel("Backflow Strength")
 
+        # plot.ylim(-1.0, 1.0)
+
+        plot.title(
+            f"Strength of backflow {n} at learning step {SNAPSHOT_INDEX}")
+
         plot.savefig(
             f'src/processing/output/strength_{SNAPSHOT_INDEX:09d}.png', dpi=300)
 
@@ -162,6 +167,11 @@ def snapshotNetworks(strength_networks, scale_networks):
 
         plot.xlabel("Temperature")
         plot.ylabel("Length Scale")
+
+        # plot.ylim(0.0, 1.0)
+
+        plot.title(
+            f"Length scale of backflow {n} at learning step {SNAPSHOT_INDEX}")
 
         plot.savefig(
             f'src/processing/output/length_{SNAPSHOT_INDEX:09d}.png', dpi=300)
@@ -220,8 +230,10 @@ if __name__ == "__main__":
     parameters = []
 
     for i in range(BACKFLOWS):
-        parameters += list(strength_networks[i].parameters())
-        parameters += list(scale_networks[i].parameters())
+        parameters += list(strength_networks[i].to(
+            tc.device(tc.get_default_device())).parameters())
+        parameters += list(scale_networks[i].to(
+            tc.device(tc.get_default_device())).parameters())
 
     parameters.append(untransformed_coordinates)
 
@@ -243,7 +255,6 @@ if __name__ == "__main__":
 
     previous_average_deviation = np.inf
     previous_log_probability = np.inf
-    convergence_data = []
     loop = 0
 
     # tc.cuda.empty_cache()
@@ -306,11 +317,8 @@ if __name__ == "__main__":
             relative_change = log_probability / previous_log_probability - 1.0
             previous_log_probability = log_probability
 
-            convergence_data.append([loop, log_probability])
-
-            # Save data
-            np.savetxt("src/processing/output/convergence.csv",
-                       np.array(convergence_data), delimiter=', ')
+            with open("src/processing/output/convergence.csv", "a") as file:
+                file.write(f"{loop}, {average_deviation}, {log_probability}\n")
 
             print(
                 f"Coordinate constraint optimised! Relative change of probability ({log_probability}) is {relative_change}!")
@@ -320,11 +328,7 @@ if __name__ == "__main__":
 
         loop += 1
 
-    print("Complete! Saving data...")
-
-    # Save data
-    np.savetxt('src/processing/output/convergence.csv',
-               np.array(convergence_data), delimiter=', ')
+    print("Complete! Saving networks...")
 
     # Pickle the networks
     pl.dump([strength_networks, scale_networks], open(
