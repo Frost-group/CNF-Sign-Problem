@@ -4,17 +4,16 @@ import torch as tc
 import numpy as np
 import os.path
 
-tc.set_default_dtype(tc.float64)
-# tc.set_default_device('cuda')
-tc.manual_seed(0)
-
 
 # Simulation parameters
-NETWORK_NEURONS = 4
-NETWORK_LAYERS = 1
+NETWORK_NEURONS = 8
+NETWORK_LAYERS = 2
 BACKFLOWS = 1
 STEP = 1e-3
-FILES = 16
+FILES = 4
+
+# Device parameters (cuda or cpu)
+DEVICE = 'cuda'
 
 # Tolerances
 CONVERGENCE_THRESHOLD = 1e-5
@@ -24,6 +23,12 @@ BACKFLOW_MAPS = {}
 
 # Network snapshot indexing
 SNAPSHOT_INDEX = 0
+
+
+tc.set_default_dtype(tc.float64)
+tc.set_default_device(DEVICE)
+tc.manual_seed(0)
+
 
 # Load learning data
 
@@ -131,7 +136,7 @@ def snapshotNetworks(strength_networks, scale_networks):
 
     global SNAPSHOT_INDEX
 
-    for n in range(BACKFLOWS):
+    for backflow in range(BACKFLOWS):
         temperatures = np.linspace(0.8, 1.2, 128)
         signs = np.linspace(0.0, 1.0, 128)
 
@@ -139,20 +144,21 @@ def snapshotNetworks(strength_networks, scale_networks):
         X = signs
 
         for i in range(X.shape[0]):
-            Y[i] = strength_networks[n](tc.tensor([signs[i], 1.0])).item()
+            Y[i] = strength_networks[backflow](
+                tc.tensor([signs[i], 1.0])).item()
 
         plot.plot(X, Y)
 
         plot.xlabel("Sign Value")
         plot.ylabel("Backflow Strength")
 
-        # plot.ylim(-1.0, 1.0)
+        plot.ylim(-60.0, 60.0)
 
         plot.title(
-            f"Strength of backflow {n} at learning step {SNAPSHOT_INDEX}")
+            f"Strength of backflow {backflow} at learning step {SNAPSHOT_INDEX}")
 
         plot.savefig(
-            f'src/processing/output/strength_{SNAPSHOT_INDEX:09d}.png', dpi=300)
+            f'src/processing/output/strength_{backflow}_{SNAPSHOT_INDEX:09d}.png', dpi=300)
 
         plot.clf()
 
@@ -160,7 +166,7 @@ def snapshotNetworks(strength_networks, scale_networks):
         X = temperatures
 
         for i in range(X.shape[0]):
-            Y[i] = abs(scale_networks[n](
+            Y[i] = abs(scale_networks[backflow](
                 tc.tensor([temperatures[i]])).item())
 
         plot.plot(X, Y)
@@ -168,13 +174,13 @@ def snapshotNetworks(strength_networks, scale_networks):
         plot.xlabel("Temperature")
         plot.ylabel("Length Scale")
 
-        # plot.ylim(0.0, 1.0)
+        plot.ylim(0.0, 15.0)
 
         plot.title(
-            f"Length scale of backflow {n} at learning step {SNAPSHOT_INDEX}")
+            f"Length scale of backflow {backflow} at learning step {SNAPSHOT_INDEX}")
 
         plot.savefig(
-            f'src/processing/output/length_{SNAPSHOT_INDEX:09d}.png', dpi=300)
+            f'src/processing/output/length_{backflow}_{SNAPSHOT_INDEX:09d}.png', dpi=300)
 
         plot.clf()
 
@@ -230,10 +236,11 @@ if __name__ == "__main__":
     parameters = []
 
     for i in range(BACKFLOWS):
+
         parameters += list(strength_networks[i].to(
-            tc.device(tc.get_default_device())).parameters())
+            tc.device(DEVICE)).parameters())
         parameters += list(scale_networks[i].to(
-            tc.device(tc.get_default_device())).parameters())
+            tc.device(DEVICE)).parameters())
 
     parameters.append(untransformed_coordinates)
 
@@ -257,7 +264,8 @@ if __name__ == "__main__":
     previous_log_probability = np.inf
     loop = 0
 
-    # tc.cuda.empty_cache()
+    if DEVICE == 'cuda':
+        tc.cuda.empty_cache()
 
     optimizer = tc.optim.AdamW(parameters, lr=STEP)
 
@@ -289,7 +297,8 @@ if __name__ == "__main__":
         print(
             f"Enforcing constraint! The average coordinate deviation ({average_deviation}) change is {relative_change}!")
 
-        # tc.cuda.empty_cache()
+        if DEVICE == 'cuda':
+            tc.cuda.empty_cache()
 
         # Probability minimisation with respect to the neural networks only, if the constraint condition has been met
         if np.abs(relative_change) < CONVERGENCE_THRESHOLD:
@@ -308,7 +317,8 @@ if __name__ == "__main__":
 
             optimizer.step()
 
-            # tc.cuda.empty_cache()
+            if DEVICE == 'cuda':
+                tc.cuda.empty_cache()
 
             # Snapshot the networks
             snapshotNetworks(strength_networks, scale_networks)
@@ -333,3 +343,8 @@ if __name__ == "__main__":
     # Pickle the networks
     pl.dump([strength_networks, scale_networks], open(
         'src/processing/output/parameters.bin', 'ab'))
+
+    # Print optimal values
+    for backflow in range(BACKFLOWS):
+        print(
+            f"Backflow number {backflow} converged with optimal strength value {strength_networks[backflow](tc.tensor([1.0, 1.0])).item()} and scale length {scale_networks[backflow](tc.tensor([1.0, 1.0])).item()}!")
