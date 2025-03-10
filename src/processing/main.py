@@ -6,11 +6,11 @@ import os.path
 
 
 # Simulation parameters
-NETWORK_NEURONS = 8
-NETWORK_LAYERS = 2
+NETWORK_NEURONS = 4
+NETWORK_LAYERS = 1
 BACKFLOWS = 1
+FILES = 128
 STEP = 1e-3
-FILES = 4
 
 # Device parameters (cuda or cpu)
 DEVICE = 'cuda'
@@ -138,7 +138,7 @@ def snapshotNetworks(strength_networks, scale_networks):
 
     for backflow in range(BACKFLOWS):
         temperatures = np.linspace(0.8, 1.2, 128)
-        signs = np.linspace(0.0, 1.0, 128)
+        signs = np.linspace(-1.0, 1.0, 128)
 
         Y = np.zeros(128)
         X = signs
@@ -152,7 +152,7 @@ def snapshotNetworks(strength_networks, scale_networks):
         plot.xlabel("Sign Value")
         plot.ylabel("Backflow Strength")
 
-        plot.ylim(-60.0, 60.0)
+        plot.ylim(-30.0, 30.0)
 
         plot.title(
             f"Strength of backflow {backflow} at learning step {SNAPSHOT_INDEX}")
@@ -278,7 +278,7 @@ if __name__ == "__main__":
 
         optimizer.zero_grad()
 
-        # Untransformed coordinate constraint with respect to the untransformed coordinates only
+        # Enforce the untransformed coordinate constraint by adjusting the neural networks as well
         for parameter in parameters:
             parameter.requires_grad = True
 
@@ -347,4 +347,4 @@ if __name__ == "__main__":
     # Print optimal values
     for backflow in range(BACKFLOWS):
         print(
-            f"Backflow number {backflow} converged with optimal strength value {strength_networks[backflow](tc.tensor([1.0, 1.0])).item()} and scale length {scale_networks[backflow](tc.tensor([1.0, 1.0])).item()}!")
+            f"Backflow number {backflow} converged with optimal strength value {strength_networks[backflow](tc.tensor([1.0, 1.0])).item()} and scale length {scale_networks[backflow](tc.tensor([1.0])).item()}!")
