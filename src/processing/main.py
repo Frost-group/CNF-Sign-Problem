@@ -13,7 +13,7 @@ FILES = 128
 STEP = 1e-3
 
 # Device parameters (cuda or cpu)
-DEVICE = 'cuda'
+DEVICE = 'cpu'
 
 # Tolerances
 CONVERGENCE_THRESHOLD = 1e-5
@@ -278,9 +278,10 @@ if __name__ == "__main__":
 
         optimizer.zero_grad()
 
-        # Enforce the untransformed coordinate constraint by adjusting the neural networks as well
+        # Enforce the untransformed coordinate constraint by adjusting the neural networks as well, if this isn't the initial step of an initial guess
         for parameter in parameters:
-            parameter.requires_grad = True
+            parameter.requires_grad = not (
+                loop == 0 and os.path.isfile("src/processing/parameters.bin"))
 
         parameters[-1].requires_grad = True
 

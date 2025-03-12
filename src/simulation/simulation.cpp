@@ -701,8 +701,8 @@ std::complex<double> XSimulation::Partition2()
 // Calculate the backflow shift
 #define BACKFLOWS 1
 
-const XNum strengths[BACKFLOWS] = {0.0};
-const XNum scales[BACKFLOWS] = {1.0};
+const XNum strengths[BACKFLOWS] = {-9.131292888266659};
+const XNum scales[BACKFLOWS] = {8.22182655039399};
 
 XNum *XSimulation::getBackflowShift(XParticle *particle)
 {
