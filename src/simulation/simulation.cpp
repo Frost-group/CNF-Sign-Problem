@@ -134,7 +134,7 @@ void XSimulation::Initial(std::istream &in, XNum seed)
 
 void XSimulation::Dump(std::ostream &out)
 {
-  std::complex<double> sign = std::exp(Partition2() - Partition());
+  std::complex<double> sign = std::exp(Partition2() - Partition()) * getBackflowAdjustment();
   double temperature = Temperature();
 
   int l, j;
@@ -738,4 +738,111 @@ XNum *XSimulation::getBackflowShift(XParticle *particle)
   }
 
   return shift;
+}
+
+XNum XSimulation::getBackflowAdjustment()
+{
+  // Make no backflow simulations more efficient
+  if (BACKFLOWS == 1 && strengths[0] == 0.0)
+    return 1.0;
+
+  XNum *jacobian = new XNum[N * N];
+  XNum factor = 0.0;
+
+  // Only particle coordinate at the same beed index interact
+  for (int bead_index = 0; bead_index < P; bead_index++)
+  {
+    for (int i = 0; i < N; i++)
+      for (int j = 0; j < N; j++)
+        jacobian[i * N + j] = getJacobianElement(i, j, bead_index);
+
+    factor += calculateDeterminant(jacobian);
+  }
+
+  delete[] jacobian;
+
+  return factor;
+}
+
+XNum XSimulation::getJacobianElement(int untransformed_index, int transformed_index, int bead_index)
+{
+  XParticle *particle = &particles[Index(transformed_index, bead_index)];
+  XNum element = 0.0;
+
+  // Only allow backflows to apply at the same imaginary time step
+  int particle_index;
+  for (particle_index = 1; particle_index <= N; ++particle_index)
+  {
+    // Non-diagonal case
+    if (untransformed_index == transformed_index)
+      particle_index = transformed_index;
+
+    XParticle other_particle = particles[Index(particle_index, bead_index)];
+
+    // Calculate distance using their weird periodics
+    double distance = 0.0;
+
+    for (int dimension = 0; dimension < D; ++dimension)
+      distance += pow(MinimumImage1(particle->coor[dimension] - other_particle.coor[dimension]), 2);
+
+    distance = sqrt(distance);
+
+    // Apply backflows
+    int backflow;
+    for (backflow = 0; backflow < BACKFLOWS; ++backflow)
+      if (untransformed_index == transformed_index)
+        element += strengths[backflow] * (pow(distance / scales[backflow], 6) + 2.0) / pow(1.0 + pow(distance / scales[backflow], 3), 2);
+      else
+        element += strengths[backflow] * (2.0 * pow(distance / scales[backflow], 3) - 1.0) / pow(1.0 + pow(distance / scales[backflow], 3), 2);
+
+    // Non-diagonal case
+    if (untransformed_index == transformed_index)
+      break;
+  }
+
+  return element;
+}
+
+XNum XSimulation::calculateDeterminant(XNum *matrix)
+{
+  double det = 1.0;
+  for (int i = 0; i < N; i++)
+  {
+    int pivot = i;
+
+    for (int j = i + 1; j < N; j++)
+    {
+      if (abs(matrix[j * N + i]) > abs(matrix[pivot * N + i]))
+      {
+        pivot = j;
+      }
+    }
+
+    if (pivot != i)
+    {
+
+      for (int p = 0; p < N; p++)
+        std::swap(matrix[i * N + p], matrix[pivot * N + p]);
+
+      det *= -1;
+    }
+
+    if (matrix[i * N + i] == 0)
+    {
+      return 0;
+    }
+
+    det *= matrix[i * N + i];
+
+    for (int j = i + 1; j < N; j++)
+    {
+      double factor = matrix[j * N + i] / matrix[i * N + i];
+      for (int k = i + 1; k < N; k++)
+      {
+        matrix[j * N + k] -= factor * matrix[i * N + k];
+      }
+    }
+  }
+
+  return det;
 }

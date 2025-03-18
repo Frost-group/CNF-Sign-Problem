@@ -68,7 +68,10 @@ public:
   std::complex<double> Partition2();
   ~XSimulation();
 
+  XNum getJacobianElement(int untransformed_index, int transformed_index, int bead_index);
+  XNum XSimulation::calculateDeterminant(XNum *matrix);
   XNum *getBackflowShift(XParticle *particle);
+  XNum getBackflowAdjustment();
 };
 
 XNum XSimulation::MinimumImage1(XNum a)
