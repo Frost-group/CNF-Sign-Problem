@@ -135,6 +135,7 @@ void XSimulation::Initial(std::istream &in, XNum seed)
 void XSimulation::Dump(std::ostream &out)
 {
   std::complex<double> sign = std::exp(Partition2() - Partition()) * getBackflowAdjustment();
+  double energy = TotalEnergy() * getBackflowAdjustment();
   double temperature = Temperature();
 
   int l, j;
@@ -143,7 +144,7 @@ void XSimulation::Dump(std::ostream &out)
     {
       int index = Index(l, j);
 
-      out << temperature << ", " << l << ", " << j << ", " << sign.real() << ", " << particles[index].coor[0] << ", " << particles[index].coor[1] << ", " << 0.0 << std::endl;
+      out << temperature << ", " << l << ", " << j << ", " << sign.real() << ", " << particles[index].coor[0] << ", " << particles[index].coor[1] << ", " << 0.0 << ", " << energy << std::endl;
     }
 }
 

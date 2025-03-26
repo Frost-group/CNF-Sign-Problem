@@ -69,7 +69,7 @@ public:
   ~XSimulation();
 
   XNum getJacobianElement(int untransformed_index, int transformed_index, int bead_index);
-  XNum XSimulation::calculateDeterminant(XNum *matrix);
+  XNum calculateDeterminant(XNum *matrix);
   XNum *getBackflowShift(XParticle *particle);
   XNum getBackflowAdjustment();
 };

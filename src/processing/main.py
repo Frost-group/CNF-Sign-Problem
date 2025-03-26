@@ -9,8 +9,8 @@ import os.path
 NETWORK_NEURONS = 4
 NETWORK_LAYERS = 1
 BACKFLOWS = 1
-FILES = 128
 STEP = 1e-3
+FILES = 16
 
 # Device parameters (cuda or cpu)
 DEVICE = 'cpu'
@@ -34,13 +34,19 @@ tc.manual_seed(0)
 
 
 def loadData():
-    data = np.genfromtxt("src/simulation/output/1.csv", delimiter=',')
 
-    for i in range(FILES - 1):
+    data = False
+
+    for i in range(FILES):
         if os.path.getsize(
-                "src/simulation/output/" + str(i + 2) + ".csv"):
-            data = np.vstack((data, np.genfromtxt(
-                "src/simulation/output/" + str(i + 2) + ".csv", delimiter=',')))
+                "src/simulation/output/" + str(i + 1) + ".csv"):
+
+            if type(data) == bool:
+                data = np.genfromtxt(
+                    "src/simulation/output/" + str(i + 1) + ".csv", delimiter=',')
+            else:
+                data = np.vstack((data, np.genfromtxt(
+                    "src/simulation/output/" + str(i + 1) + ".csv", delimiter=',')))
 
     return tc.tensor(data, requires_grad=False)
 
@@ -196,6 +202,9 @@ if __name__ == "__main__":
 
     print(
         f"Calculated average sign of {tc.mean(data[:, 3]).item()} with a standard deviation of {tc.std(data[:, 3]).item()}!")
+
+    print(
+        f"Calculated average energy of {tc.mean(data[:, 3] * data[:, 7]).item()} with a standard deviation of {tc.std(data[:, 3] * data[:, 7]).item()}!")
 
     # Build backflow coordinate mapping tensor
     buildBackflowMap(data)
