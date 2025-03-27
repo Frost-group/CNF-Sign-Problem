@@ -133,7 +133,7 @@ void XSimulation::Initial(std::istream &in, XNum seed)
 void XSimulation::Dump(std::ostream &out)
 {
   std::complex<double> sign = std::exp(Partition2() - Partition());
-  XNum backflow_adjustment = log(getBackflowAdjustment());
+  XNum backflow_adjustment = getBackflowAdjustment();
   XNum temperature = Temperature();
 
   std::complex<double> energy = TotalEnergy() * sign * backflow_adjustment;
