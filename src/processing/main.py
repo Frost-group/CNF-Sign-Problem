@@ -190,7 +190,7 @@ def snapshotNetworks(strength_networks, scale_networks):
 
         plot.clf()
 
-        SNAPSHOT_INDEX += 1
+    SNAPSHOT_INDEX += 1
 
 
 if __name__ == "__main__":
@@ -204,7 +204,10 @@ if __name__ == "__main__":
         f"Calculated average sign of {tc.mean(data[:, 3]).item()} with a standard deviation of {tc.std(data[:, 3]).item()}!")
 
     print(
-        f"Calculated average energy of {tc.mean(data[:, 3] * data[:, 7]).item()} with a standard deviation of {tc.std(data[:, 3] * data[:, 7]).item()}!")
+        f"Calculated average energy of {tc.mean(data[:, 8]).item()} with a standard deviation of {tc.std(data[:, 8]).item()}!")
+
+    print(
+        f"Calculated adjustment factor of {tc.mean(data[:, 7]).item()} with a standard deviation of {tc.std(data[:, 7]).item()}!")
 
     # Build backflow coordinate mapping tensor
     buildBackflowMap(data)

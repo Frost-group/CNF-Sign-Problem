@@ -23,7 +23,6 @@ int main(int argc, char *argv[])
 
   for (i = 0; i < simul.step; ++i)
   {
-    simul.PeriodBoundary();
     simul.UpdateMNHC_VV3();
 
     if (!simul.ok)

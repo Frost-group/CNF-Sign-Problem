@@ -13,7 +13,6 @@ private:
   XParticle *particles;
   XParticle center;
   int N, P;
-  XNum L;
   XNum beta, T;
   XNum vi;
   XNum beta2, vi2, g2, s2;
@@ -31,8 +30,6 @@ private:
 public:
   int step;
   bool ok;
-  inline XNum MinimumImage1(XNum a);
-  inline XNum MinimumImage2(XNum a);
   inline int Index(int l, int j) { return (l - 1) * P + j - 1; }
   XNum Distance(XParticle *p1, XParticle *p2);
   void RelativeDistance(XParticle *p1, XParticle *p2, XNum *displace);
@@ -61,7 +58,6 @@ public:
   XNum PairEnergy(int index, int index2);
   XNum TotalEnergy();
   void NHForce(XNum m, int f, XNum *v, XNum *Q, XNum *vtheta, XNum *res);
-  void PeriodBoundary();
   XNum Temperature();
   void SetOmg(XNum o) { omg0 = o; }
   XNum Partition();
@@ -73,24 +69,5 @@ public:
   XNum *getBackflowShift(XParticle *particle);
   XNum getBackflowAdjustment();
 };
-
-XNum XSimulation::MinimumImage1(XNum a)
-{
-  if (std::abs(a) > L / 2)
-    return L - std::abs(a);
-  return a;
-}
-
-XNum XSimulation::MinimumImage2(XNum a)
-{
-  if (std::abs(a) > L / 2)
-  {
-    if (a < 0)
-      return L - std::abs(a);
-    else
-      return -(L - std::abs(a));
-  }
-  return a;
-}
 
 #endif

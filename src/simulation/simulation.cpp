@@ -10,7 +10,7 @@ XNum XSimulation::Distance(XParticle *p1, XParticle *p2)
   int i;
   for (i = 0; i < D; ++i)
   {
-    XNum a = MinimumImage1(p1->coor[i] - p2->coor[i]) + (p1_shift[i] - p2_shift[i]);
+    XNum a = (p1->coor[i] - p2->coor[i]) + (p1_shift[i] - p2_shift[i]);
     res += a * a;
   }
 
@@ -27,7 +27,7 @@ void XSimulation::RelativeDistance(XParticle *p1, XParticle *p2, XNum *displace)
 
   int i;
   for (i = 0; i < D; ++i)
-    displace[i] = MinimumImage2(p1->coor[i] - p2->coor[i]) + (p1_shift[i] - p2_shift[i]);
+    displace[i] = (p1->coor[i] - p2->coor[i]) + (p1_shift[i] - p2_shift[i]);
 
   delete[] p1_shift;
   delete[] p2_shift;
@@ -54,8 +54,6 @@ void XSimulation::Initial(std::istream &in, XNum seed)
       beta2 = 1 / (kB * T);
       beta = 1 / (kB * T);
     }
-    else if (parameter == "L")
-      in >> L;
     else if (parameter == "vi")
       in >> vi;
     else if (parameter == "vi2")
@@ -97,7 +95,7 @@ void XSimulation::Initial(std::istream &in, XNum seed)
         particles[index].vel[i] = tmp;
       }
       for (i = 0; i < D; ++i)
-        particles[index].coor[i] = L / 2 + 1.0 * (XRandFloat() - 0.5);
+        particles[index].coor[i] = 1.0 * (XRandFloat() - 0.5);
     }
   for (i = 0; i < D; ++i)
     vs[i] /= N * P;
@@ -125,7 +123,7 @@ void XSimulation::Initial(std::istream &in, XNum seed)
   VBCache2 = new std::complex<double>[N + 1];
   ForceVBCache = new XNum[D * N * P];
   for (i = 0; i < D; ++i)
-    center.coor[i] = L / 2;
+    center.coor[i] = 0.0;
   t = 0;
   ForceCache = NULL;
   count = 0;
@@ -134,9 +132,12 @@ void XSimulation::Initial(std::istream &in, XNum seed)
 
 void XSimulation::Dump(std::ostream &out)
 {
-  std::complex<double> sign = std::exp(Partition2() - Partition()) * getBackflowAdjustment();
-  double energy = TotalEnergy() * getBackflowAdjustment();
-  double temperature = Temperature();
+  std::complex<double> sign = std::exp(Partition2() - Partition());
+  XNum backflow_adjustment = log(getBackflowAdjustment());
+  XNum temperature = Temperature();
+
+  std::complex<double> energy = TotalEnergy() * sign * backflow_adjustment;
+  std::complex<double> factor = sign * backflow_adjustment;
 
   int l, j;
   for (l = 1; l <= N; ++l)
@@ -144,7 +145,7 @@ void XSimulation::Dump(std::ostream &out)
     {
       int index = Index(l, j);
 
-      out << temperature << ", " << l << ", " << j << ", " << sign.real() << ", " << particles[index].coor[0] << ", " << particles[index].coor[1] << ", " << 0.0 << ", " << energy << std::endl;
+      out << temperature << ", " << l << ", " << j << ", " << sign.real() << ", " << particles[index].coor[0] << ", " << particles[index].coor[1] << ", " << 0.0 << ", " << factor.real() << ", " << energy.real() << std::endl;
     }
 }
 
@@ -542,28 +543,6 @@ void XSimulation::UpdateMNHC_VV3()
   }
 }
 
-void XSimulation::PeriodBoundary()
-{
-  int j;
-  for (j = 0; j < N * P; ++j)
-  {
-    int i;
-    for (i = 0; i < D; ++i)
-    {
-      if (particles[j].coor[i] < 0)
-      {
-        int n = (int)(std::abs(particles[j].coor[i]) / L);
-        particles[j].coor[i] += (n + 1) * L;
-      }
-      else
-      {
-        int n = (int)(std::abs(particles[j].coor[i]) / L);
-        particles[j].coor[i] -= n * L;
-      }
-    }
-  }
-}
-
 XNum XSimulation::Temperature()
 {
   XNum sum = 0;
@@ -723,19 +702,19 @@ XNum *XSimulation::getBackflowShift(XParticle *particle)
   {
     XParticle other_particle = particles[Index(particle_index, particle->p)];
 
-    // Calculate distance using their weird periodics
+    // Calculate distance
     double distance = 0.0;
 
     for (dimension = 0; dimension < D; ++dimension)
-      distance += pow(MinimumImage1(particle->coor[dimension] - other_particle.coor[dimension]), 2);
+      distance += pow((particle->coor[dimension] - other_particle.coor[dimension]), 2);
 
     distance = sqrt(distance);
 
-    // Apply backflows using their weird periodics
+    // Apply backflows
     int backflow;
     for (backflow = 0; backflow < BACKFLOWS; ++backflow)
       for (dimension = 0; dimension < D; ++dimension)
-        shift[dimension] += MinimumImage2(particle->coor[dimension] - other_particle.coor[dimension]) * strengths[backflow] / (1.0 + pow(distance / scales[backflow], 3));
+        shift[dimension] += (particle->coor[dimension] - other_particle.coor[dimension]) * strengths[backflow] / (1.0 + pow(distance / scales[backflow], 3));
   }
 
   return shift;
@@ -780,11 +759,11 @@ XNum XSimulation::getJacobianElement(int untransformed_index, int transformed_in
 
     XParticle other_particle = particles[Index(particle_index, bead_index)];
 
-    // Calculate distance using their weird periodics
+    // Calculate distance
     double distance = 0.0;
 
     for (int dimension = 0; dimension < D; ++dimension)
-      distance += pow(MinimumImage1(particle->coor[dimension] - other_particle.coor[dimension]), 2);
+      distance += pow(particle->coor[dimension] - other_particle.coor[dimension], 2);
 
     distance = sqrt(distance);
 
