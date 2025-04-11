@@ -8,9 +8,9 @@ import os.path
 # Simulation parameters
 NETWORK_NEURONS = 4
 NETWORK_LAYERS = 1
-BACKFLOWS = 1
+BACKFLOWS = 4
+FILES = 128
 STEP = 1e-3
-FILES = 16
 
 # Device parameters (cuda or cpu)
 DEVICE = 'cpu'
@@ -35,9 +35,12 @@ tc.manual_seed(0)
 
 def loadData():
 
+    global FILES
     data = False
 
     for i in range(FILES):
+
+        # Check if file is not empty from simulation failure
         if os.path.getsize(
                 "src/simulation/output/" + str(i + 1) + ".csv"):
 
@@ -47,6 +50,9 @@ def loadData():
             else:
                 data = np.vstack((data, np.genfromtxt(
                     "src/simulation/output/" + str(i + 1) + ".csv", delimiter=',')))
+
+        else:
+            FILES -= 1
 
     return tc.tensor(data, requires_grad=False)
 
@@ -158,7 +164,7 @@ def snapshotNetworks(strength_networks, scale_networks):
         plot.xlabel("Sign Value")
         plot.ylabel("Backflow Strength")
 
-        plot.ylim(-30.0, 30.0)
+        plot.ylim(-20.0, 20.0)
 
         plot.title(
             f"Strength of backflow {backflow} at learning step {SNAPSHOT_INDEX}")
@@ -180,7 +186,7 @@ def snapshotNetworks(strength_networks, scale_networks):
         plot.xlabel("Temperature")
         plot.ylabel("Length Scale")
 
-        plot.ylim(0.0, 15.0)
+        plot.ylim(0.0, 0.05)
 
         plot.title(
             f"Length scale of backflow {backflow} at learning step {SNAPSHOT_INDEX}")
@@ -189,6 +195,10 @@ def snapshotNetworks(strength_networks, scale_networks):
             f'src/processing/output/length_{backflow}_{SNAPSHOT_INDEX:09d}.png', dpi=300)
 
         plot.clf()
+
+        # Pickle the networks
+        pl.dump([strength_networks, scale_networks], open(
+            f'src/processing/output/parameters_{SNAPSHOT_INDEX:09d}.bin', 'ab'))
 
     SNAPSHOT_INDEX += 1
 
@@ -200,14 +210,13 @@ if __name__ == "__main__":
     # Read distribution data
     data = loadData()
 
-    print(
-        f"Calculated average sign of {tc.mean(data[:, 3]).item()} with a standard deviation of {tc.std(data[:, 3]).item()}!")
+    # Print statistics for the observables
+    point_number = int(max(data[:, 1])) * int(max(data[:, 2]))
 
-    print(
-        f"Calculated average energy of {tc.mean(data[:, 8]).item()} with a standard deviation of {tc.std(data[:, 8]).item()}!")
-
-    print(
-        f"Calculated adjustment factor of {tc.mean(data[:, 7]).item()} with a standard deviation of {tc.std(data[:, 7]).item()}!")
+    with open("src/processing/output/observables.csv", "a") as file:
+        for i in range(FILES):
+            file.write(
+                f"{i}, {tc.mean(data[0:(i + 1)*point_number, 3]).item()}, {tc.mean(data[0:(i + 1)*point_number, 7]).item()}, {tc.mean(data[0:(i + 1)*point_number, 8]).item()}\n")
 
     # Build backflow coordinate mapping tensor
     buildBackflowMap(data)
@@ -351,13 +360,9 @@ if __name__ == "__main__":
 
         loop += 1
 
-    print("Complete! Saving networks...")
-
-    # Pickle the networks
-    pl.dump([strength_networks, scale_networks], open(
-        'src/processing/output/parameters.bin', 'ab'))
+    print("Simulation converged!")
 
     # Print optimal values
     for backflow in range(BACKFLOWS):
         print(
-            f"Backflow number {backflow} converged with optimal strength value {strength_networks[backflow](tc.tensor([1.0, 1.0])).item()} and scale length {scale_networks[backflow](tc.tensor([1.0])).item()}!")
+            f"Backflow number {backflow} converged with optimal strength value {strength_networks[backflow](tc.tensor([1.0, 1.0])).item()} and scale length {tc.abs(scale_networks[backflow](tc.tensor([1.0]))).item()}!")

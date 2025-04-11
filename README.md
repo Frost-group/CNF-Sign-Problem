@@ -32,3 +32,9 @@ This program has had the following releases:
 ### 1.0 Stable - 27th of February 2025
 
 - Initial release of the software.
+
+### 2.0 Stable - 11th of April 2025
+
+- Correct implementation of the backflow transformation in the simulation part of the software.
+- Validated to learn the fermionic nodal surface with multiple backflow functions.
+- Various analysis and usability improvements.
