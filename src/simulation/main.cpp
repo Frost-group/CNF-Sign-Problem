@@ -5,11 +5,13 @@
 
 int main(int argc, char *argv[])
 {
-  std::ofstream out_file;
+  std::ofstream statistics_file;
+  std::ofstream data_file;
   std::ifstream in_file;
   XSimulation simul;
 
-  out_file.open("output/" + std::string(argv[1]) + ".csv");
+  statistics_file.open("output/statistics_" + std::string(argv[1]) + ".csv");
+  data_file.open("output/data_" + std::string(argv[1]) + ".csv");
   in_file.open("options.txt");
 
   simul.Initial(in_file, atoi(argv[1]));
@@ -31,15 +33,19 @@ int main(int argc, char *argv[])
       return 0;
     }
 
-    if (i % 1000 == 0)
+    if (i % simul.skip == 0)
+    {
       std::cout << "Completed " << i << " steps!" << std::endl;
+      simul.Dump(statistics_file, data_file, false);
+    }
   }
 
-  std::cout << "Saving data..." << std::endl;
+  std::cout << "Saving distributions..." << std::endl;
 
-  simul.Dump(out_file);
+  simul.Dump(statistics_file, data_file, true);
 
-  std::cout << "The total energy was calculated to be " << simul.TotalEnergy() << "!" << std::endl;
+  statistics_file.close();
+  data_file.close();
 
   t = clock() - t;
 

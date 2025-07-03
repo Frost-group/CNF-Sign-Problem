@@ -29,13 +29,14 @@ private:
 
 public:
   int step;
+  int skip;
   bool ok;
   inline int Index(int l, int j) { return (l - 1) * P + j - 1; }
   XNum Distance(XParticle *p1, XParticle *p2);
   void RelativeDistance(XParticle *p1, XParticle *p2, XNum *displace);
   XSimulation() {}
   void Initial(std::istream &in, XNum seed);
-  void Dump(std::ostream &out);
+  void Dump(std::ostream &statistics_file, std::ostream &data_file, bool save_distributions);
   void VelocityRescale();
   XNum *Force();
   void UpdateMNHC_VV3();

@@ -42,14 +42,14 @@ def loadData():
 
         # Check if file is not empty from simulation failure
         if os.path.getsize(
-                "src/simulation/output/" + str(i + 1) + ".csv"):
+                "src/simulation/output/data_" + str(i + 1) + ".csv"):
 
             if type(data) == bool:
                 data = np.genfromtxt(
-                    "src/simulation/output/" + str(i + 1) + ".csv", delimiter=',')
+                    "src/simulation/output/data_" + str(i + 1) + ".csv", delimiter=',')
             else:
                 data = np.vstack((data, np.genfromtxt(
-                    "src/simulation/output/" + str(i + 1) + ".csv", delimiter=',')))
+                    "src/simulation/output/data_" + str(i + 1) + ".csv", delimiter=',')))
 
         else:
             FILES -= 1
