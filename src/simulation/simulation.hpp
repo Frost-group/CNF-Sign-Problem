@@ -36,7 +36,7 @@ public:
   void RelativeDistance(XParticle *p1, XParticle *p2, XNum *displace);
   XSimulation() {}
   void Initial(std::istream &in, XNum seed);
-  void Dump(std::ostream &statistics_file, std::ostream &data_file, bool save_distributions);
+  void Dump(std::ostream &observables_file, std::ostream &data_file, std::ostream &density_file, bool save_distributions);
   void VelocityRescale();
   XNum *Force();
   void UpdateMNHC_VV3();

@@ -132,7 +132,7 @@ void XSimulation::Initial(std::istream &in, XNum seed)
   ok = true;
 }
 
-void XSimulation::Dump(std::ostream &statistics_file, std::ostream &data_file, bool save_distributions)
+void XSimulation::Dump(std::ostream &observables_file, std::ostream &data_file, std::ostream &density_file, bool save_distributions)
 {
   std::complex<double> sign = std::exp(Partition2() - Partition());
   XNum backflow_adjustment = getBackflowAdjustment();
@@ -155,12 +155,16 @@ void XSimulation::Dump(std::ostream &statistics_file, std::ostream &data_file, b
   XNum optimal_backflow_value = 0.0;
 
   for (l = 0; l < N * P; ++l)
+  {
     for (j = 0; j < N * P; ++j)
       optimal_backflow_value += (2 * pow(pow(particles[l].coor[0], 2) + pow(particles[l].coor[1], 2), 1.5) + 2 * pow(pow(particles[l].coor[0], 2) + pow(particles[j].coor[1], 2), 1.5) + (pow(particles[l].coor[0] - particles[j].coor[0], 2) + pow(particles[l].coor[1] - particles[j].coor[1], 2)) * pow(pow(particles[j].coor[0] + particles[l].coor[0], 2) + pow(particles[j].coor[1] + particles[l].coor[1], 2), 0.5)) / pow(pow(particles[l].coor[0], 2) + pow(particles[l].coor[1], 2), 2) / pow(pow(particles[j].coor[0], 2) + pow(particles[j].coor[1], 2), 2);
 
+    density_file << std::floor(l / P) << ", " << particles[l].coor[0] << ", " << particles[l].coor[1] << std::endl;
+  }
+
   optimal_backflow_value = temperature / optimal_backflow_value;
 
-  statistics_file << energy.real() << ", " << factor.real() << ", " << optimal_backflow_value << std::endl;
+  observables_file << energy.real() << ", " << factor.real() << ", " << optimal_backflow_value << std::endl;
 }
 
 XSimulation::~XSimulation()

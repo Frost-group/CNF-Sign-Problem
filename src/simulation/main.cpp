@@ -5,12 +5,14 @@
 
 int main(int argc, char *argv[])
 {
-  std::ofstream statistics_file;
+  std::ofstream observables_file;
+  std::ofstream density_file;
   std::ofstream data_file;
   std::ifstream in_file;
   XSimulation simul;
 
-  statistics_file.open("output/statistics_" + std::string(argv[1]) + ".csv");
+  observables_file.open("output/observables_" + std::string(argv[1]) + ".csv");
+  density_file.open("output/density_" + std::string(argv[1]) + ".csv");
   data_file.open("output/data_" + std::string(argv[1]) + ".csv");
   in_file.open("options.txt");
 
@@ -36,15 +38,16 @@ int main(int argc, char *argv[])
     if (i % simul.skip == 0)
     {
       std::cout << "Completed " << i << " steps!" << std::endl;
-      simul.Dump(statistics_file, data_file, false);
+      simul.Dump(observables_file, data_file, density_file, false);
     }
   }
 
   std::cout << "Saving distributions..." << std::endl;
 
-  simul.Dump(statistics_file, data_file, true);
+  simul.Dump(observables_file, data_file, density_file, true);
 
-  statistics_file.close();
+  observables_file.close();
+  density_file.close();
   data_file.close();
 
   t = clock() - t;
