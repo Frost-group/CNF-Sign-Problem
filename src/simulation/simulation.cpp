@@ -154,16 +154,11 @@ void XSimulation::Dump(std::ostream &statistics_file, std::ostream &data_file, b
 
   XNum optimal_backflow_value = 0.0;
 
-  for (l = 1; l <= N; ++l)
-    for (j = 1; j <= N; ++j)
-    {
-      int index_l = Index(l, P);
-      int index_j = Index(j, P);
+  for (l = 0; l < N * P; ++l)
+    for (j = 0; j < N * P; ++j)
+      optimal_backflow_value += (2 * pow(pow(particles[l].coor[0], 2) + pow(particles[l].coor[1], 2), 1.5) + 2 * pow(pow(particles[l].coor[0], 2) + pow(particles[j].coor[1], 2), 1.5) + (pow(particles[l].coor[0] - particles[j].coor[0], 2) + pow(particles[l].coor[1] - particles[j].coor[1], 2)) * pow(pow(particles[j].coor[0] + particles[l].coor[0], 2) + pow(particles[j].coor[1] + particles[l].coor[1], 2), 0.5)) / pow(pow(particles[l].coor[0], 2) + pow(particles[l].coor[1], 2), 2) / pow(pow(particles[j].coor[0], 2) + pow(particles[j].coor[1], 2), 2);
 
-      optimal_backflow_value += (2 * pow(pow(particles[index_l].coor[0], 2) + pow(particles[index_l].coor[1], 2), 1.5) + 2 * pow(pow(particles[index_j].coor[0], 2) + pow(particles[index_j].coor[1], 2), 1.5) + (pow(particles[index_l].coor[0] - particles[index_j].coor[0], 2) + pow(particles[index_l].coor[1] - particles[index_j].coor[1], 2)) * pow(pow(particles[index_j].coor[0] + particles[index_l].coor[0], 2) + pow(particles[index_j].coor[1] + particles[index_l].coor[1], 2), 0.5)) / pow(pow(particles[index_l].coor[0], 2) + pow(particles[index_l].coor[1], 2), 2) / pow(pow(particles[index_j].coor[0], 2) + pow(particles[index_j].coor[1], 2), 2);
-    }
-
-  optimal_backflow_value = 1.0 / (optimal_backflow_value * temperature);
+  optimal_backflow_value = temperature / optimal_backflow_value;
 
   statistics_file << energy.real() << ", " << factor.real() << ", " << optimal_backflow_value << std::endl;
 }
