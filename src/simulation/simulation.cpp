@@ -163,7 +163,11 @@ void XSimulation::Dump(std::ostream &observables_file, std::ostream &data_file, 
       XNum *j_shift = getBackflowShift(&particles[j]);
 
       optimal_backflow_value += (2 * pow(pow(particles[l].coor[0] + l_shift[0], 2) + pow(particles[l].coor[1] + l_shift[1], 2), 1.5) + 2 * pow(pow(particles[l].coor[0] + l_shift[0], 2) + pow(particles[j].coor[1] + j_shift[1], 2), 1.5) + (pow(particles[l].coor[0] + l_shift[0] - particles[j].coor[0] - j_shift[0], 2) + pow(particles[l].coor[1] + l_shift[1] - particles[j].coor[1] - j_shift[1], 2)) * pow(pow(particles[j].coor[0] + j_shift[0] + particles[l].coor[0] + l_shift[0], 2) + pow(particles[j].coor[1] + j_shift[1] + particles[l].coor[1] + l_shift[1], 2), 0.5)) / pow(pow(particles[l].coor[0] + l_shift[0], 2) + pow(particles[l].coor[1] + l_shift[1], 2), 2) / pow(pow(particles[j].coor[0] + j_shift[0], 2) + pow(particles[j].coor[1] + j_shift[1], 2), 2);
+
+      delete[] j_shift;
     }
+
+    delete[] l_shift;
 
     density_file << std::floor(l / P) << ", " << particles[l].coor[0] + l_shift[0] << ", " << particles[l].coor[1] + l_shift[1] << std::endl;
   }
