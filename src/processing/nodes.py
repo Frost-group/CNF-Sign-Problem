@@ -1,56 +1,35 @@
 import matplotlib.pyplot as mp
 import numpy as np
-import scipy as sp
-import os.path
 
-# Processing parameters
-FILES = 1024
-BOUND = 1.0
-N = 128
+RANGE = 4.0
+BINS = 128
 
-print("Reading data files...")
+print("Reading and processing data file...")
 
-data = False
+data = np.genfromtxt("src/simulation/output/density.csv", delimiter=',')
 
-for i in range(FILES):
+x_coordinates = data[np.logical_and(np.logical_and(data[:, 0] == 0, np.abs(
+    data[:, 1]) < RANGE), np.abs(data[:, 2]) < RANGE), 1]
+y_coordinates = data[np.logical_and(np.logical_and(data[:, 0] == 0, np.abs(
+    data[:, 1]) < RANGE), np.abs(data[:, 2]) < RANGE), 2]
 
-    # Check if file is not empty from simulation failure
-    if os.path.getsize(
-            "src/simulation/output/density_" + str(i + 1) + ".csv"):
+print("Plotting and saving figures...")
 
-        if type(data) == bool:
-            data = np.genfromtxt(
-                "src/simulation/output/density_" + str(i + 1) + ".csv", delimiter=',')
-        else:
-            data = np.vstack((data, np.genfromtxt(
-                "src/simulation/output/density_" + str(i + 1) + ".csv", delimiter=',')))
+counts, ybins, xbins, image = mp.hist2d(
+    x_coordinates, y_coordinates, bins=BINS ^ 2)
 
-    else:
-        FILES -= 1
-
-print(f"Found {FILES} data files! Plotting and saving data...")
-
-x_coordinates = data[data[:, 0] == 0, 1]
-y_coordinates = data[data[:, 0] == 0, 2]
-
-coordinate_bins = np.linspace(-BOUND, BOUND, N + 1)
-
-binned_density = sp.stats.binned_statistic_2d(
-    x_coordinates, y_coordinates, None, statistic='count', bins=[coordinate_bins, coordinate_bins])
-
-statistics = []
-
-for x in range(N):
-    for y in range(N):
-        statistics.append([-BOUND + BOUND * x / (N - 1), -BOUND +
-                          BOUND * y / (N - 1), binned_density.statistic[x, y]])
-
-np.savetxt("statistics.csv", statistics, delimiter=',')
-
-image = mp.imshow(binned_density.statistic.T,
-                  origin='lower', extent=[-BOUND, BOUND, -BOUND, BOUND], aspect='auto', cmap='Reds')
 bar = mp.colorbar(image)
 
 mp.tight_layout()
 
-mp.savefig('density.png', dpi=300)
+mp.savefig('src/processing/output/density.png', dpi=300)
+
+mp.clf()
+
+mp.axis('off')
+
+figure = mp.contour(counts, extent=[
+                    xbins.min(), xbins.max(), ybins.min(), ybins.max()], levels=[20])
+
+mp.savefig('src/processing/output/nodes.png',
+           dpi=96, bbox_inches='tight', pad_inches=0)

@@ -156,10 +156,16 @@ void XSimulation::Dump(std::ostream &observables_file, std::ostream &data_file, 
 
   for (l = 0; l < N * P; ++l)
   {
-    for (j = 0; j < N * P; ++j)
-      optimal_backflow_value += (2 * pow(pow(particles[l].coor[0], 2) + pow(particles[l].coor[1], 2), 1.5) + 2 * pow(pow(particles[l].coor[0], 2) + pow(particles[j].coor[1], 2), 1.5) + (pow(particles[l].coor[0] - particles[j].coor[0], 2) + pow(particles[l].coor[1] - particles[j].coor[1], 2)) * pow(pow(particles[j].coor[0] + particles[l].coor[0], 2) + pow(particles[j].coor[1] + particles[l].coor[1], 2), 0.5)) / pow(pow(particles[l].coor[0], 2) + pow(particles[l].coor[1], 2), 2) / pow(pow(particles[j].coor[0], 2) + pow(particles[j].coor[1], 2), 2);
+    XNum *l_shift = getBackflowShift(&particles[l]);
 
-    density_file << std::floor(l / P) << ", " << particles[l].coor[0] << ", " << particles[l].coor[1] << std::endl;
+    for (j = 0; j < N * P; ++j)
+    {
+      XNum *j_shift = getBackflowShift(&particles[j]);
+
+      optimal_backflow_value += (2 * pow(pow(particles[l].coor[0] + l_shift[0], 2) + pow(particles[l].coor[1] + l_shift[1], 2), 1.5) + 2 * pow(pow(particles[l].coor[0] + l_shift[0], 2) + pow(particles[j].coor[1] + j_shift[1], 2), 1.5) + (pow(particles[l].coor[0] + l_shift[0] - particles[j].coor[0] - j_shift[0], 2) + pow(particles[l].coor[1] + l_shift[1] - particles[j].coor[1] - j_shift[1], 2)) * pow(pow(particles[j].coor[0] + j_shift[0] + particles[l].coor[0] + l_shift[0], 2) + pow(particles[j].coor[1] + j_shift[1] + particles[l].coor[1] + l_shift[1], 2), 0.5)) / pow(pow(particles[l].coor[0] + l_shift[0], 2) + pow(particles[l].coor[1] + l_shift[1], 2), 2) / pow(pow(particles[j].coor[0] + j_shift[0], 2) + pow(particles[j].coor[1] + j_shift[1], 2), 2);
+    }
+
+    density_file << std::floor(l / P) << ", " << particles[l].coor[0] + l_shift[0] << ", " << particles[l].coor[1] + l_shift[1] << std::endl;
   }
 
   optimal_backflow_value = temperature / optimal_backflow_value;
@@ -697,10 +703,10 @@ std::complex<double> XSimulation::Partition2()
 }
 
 // Calculate the backflow shift
-#define BACKFLOWS 4
+#define BACKFLOWS 1
 
-const XNum strengths[BACKFLOWS] = {-13.775938945726754, -13.776069319198752, -13.76672399243081, -9.837847848621011e-09};
-const XNum scales[BACKFLOWS] = {0.0345980641636478, 0.03459823826087988, 0.0347509697879476, 2.5788320786788432e-20};
+const XNum strengths[BACKFLOWS] = {-15.83};
+const XNum scales[BACKFLOWS] = {0.05374};
 
 XNum *XSimulation::getBackflowShift(XParticle *particle)
 {
