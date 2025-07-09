@@ -21,7 +21,7 @@ ffmpeg -f image2 -r 60 -pattern_type glob -i 'src/processing/output/strength_*.p
 
 There are two main structures:
 
-- The `Processing` structure in ```src/processing/main.py``` which contains the transformation analysis software,
+- The `Processing` structure in ```src/processing/``` which contains the backflow learning and nodal plotting software,
 - The `Simulation` structure in ```src/simulation/``` which contains the adjusted path integral simulation code.
 
 ## Changelog
@@ -38,3 +38,9 @@ This program has had the following releases:
 - Correct implementation of the backflow transformation in the simulation part of the software.
 - Validated to learn the fermionic nodal surface with multiple backflow functions.
 - Various analysis and usability improvements.
+
+### 3.0 Stable - 9th of July 2025
+
+- Added observable measurements, including for backflow parameter prediction.
+- Added nodal surface data generation, processing and plotting.
+

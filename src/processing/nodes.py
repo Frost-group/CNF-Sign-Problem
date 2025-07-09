@@ -1,31 +1,45 @@
 import matplotlib.pyplot as mp
+import pickle as pl
 import numpy as np
+import scipy as sp
 import os.path
 
 # Processing parameters
 FILES = 1024
-RANGE = 4.0
-BINS = 128
+
+# Plotting parameters
+RANGE = 1.0
+BINS = 4096
 
 print("Reading data files...")
 
 data = False
 
-for i in range(FILES):
+# Check if there is cache present, otherwise read everything
+if os.path.isfile("src/processing/output/density.bin"):
+    data = pl.load(open('src/processing/output/density.bin', 'rb'))
+else:
+    for i in range(FILES):
 
-    # Check if file is not empty from simulation failure
-    if os.path.getsize(
-            "src/simulation/output/density_" + str(i + 1) + ".csv"):
+        print(f"Processing file {i}...")
 
-        if type(data) == bool:
-            data = np.genfromtxt(
-                "src/simulation/output/density_" + str(i + 1) + ".csv", delimiter=',')
+        # Check if file is not empty from simulation failure
+        if os.path.getsize(
+                "src/simulation/output/density_" + str(i + 1) + ".csv"):
+
+            if type(data) == bool:
+                data = np.genfromtxt(
+                    "src/simulation/output/density_" + str(i + 1) + ".csv", delimiter=',')
+            else:
+                data = np.vstack((data, np.genfromtxt(
+                    "src/simulation/output/density_" + str(i + 1) + ".csv", delimiter=',')))
+
         else:
-            data = np.vstack((data, np.genfromtxt(
-                "src/simulation/output/density_" + str(i + 1) + ".csv", delimiter=',')))
+            FILES -= 1
 
-    else:
-        FILES -= 1
+    # Cache the data
+    pl.dump(data, open(
+        f'src/processing/output/density.bin', 'ab'))
 
 print(f"Found {FILES} data files! Processing data...")
 
@@ -34,13 +48,21 @@ x_coordinates = data[np.logical_and(np.logical_and(data[:, 0] == 0, np.abs(
     data[:, 1]) < RANGE), np.abs(data[:, 2]) < RANGE), 1]
 y_coordinates = data[np.logical_and(np.logical_and(data[:, 0] == 0, np.abs(
     data[:, 1]) < RANGE), np.abs(data[:, 2]) < RANGE), 2]
+sign_values = data[np.logical_and(np.logical_and(data[:, 0] == 0, np.abs(
+    data[:, 1]) < RANGE), np.abs(data[:, 2]) < RANGE), 3]
+
+print(f"Average data point density of {sign_values.shape[0] / (BINS ^ 2)}!")
 
 print("Plotting and saving figures...")
 
 # Bin the statistics
-counts, ybins, xbins, image = mp.hist2d(
-    x_coordinates, y_coordinates, bins=BINS ^ 2)
+coordinate_bins = np.linspace(-RANGE, RANGE, BINS + 1)
 
+binned_density = sp.stats.binned_statistic_2d(
+    x_coordinates, y_coordinates, sign_values, bins=[coordinate_bins, coordinate_bins])
+
+image = mp.imshow(binned_density.statistic.T,
+                  extent=[-RANGE, RANGE, -RANGE, RANGE])
 bar = mp.colorbar(image)
 
 mp.tight_layout()
@@ -53,8 +75,7 @@ mp.clf()
 mp.axis('off')
 
 # Adjust the countours here with the levels argument
-figure = mp.contour(counts, extent=[
-                    xbins.min(), xbins.max(), ybins.min(), ybins.max()], levels=[20])
+figure = mp.contour(binned_density.statistic.T, levels=[0])
 
 # Change the dpi here for a different amount of pixels
 mp.savefig('src/processing/output/nodes.png',

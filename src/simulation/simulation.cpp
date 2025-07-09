@@ -169,12 +169,12 @@ void XSimulation::Dump(std::ostream &observables_file, std::ostream &data_file, 
 
     delete[] l_shift;
 
-    density_file << std::floor(l / P) << ", " << particles[l].coor[0] + l_shift[0] << ", " << particles[l].coor[1] + l_shift[1] << std::endl;
+    density_file << std::floor(l / P) << ", " << particles[l].coor[0] + l_shift[0] << ", " << particles[l].coor[1] + l_shift[1] << ", " << sign.real() << std::endl;
   }
 
   optimal_backflow_value = temperature / optimal_backflow_value;
 
-  observables_file << energy.real() << ", " << factor.real() << ", " << optimal_backflow_value << std::endl;
+  observables_file << energy.real() << ", " << factor.real() << ", " << sign.real() << ", " << optimal_backflow_value << std::endl;
 }
 
 XSimulation::~XSimulation()
