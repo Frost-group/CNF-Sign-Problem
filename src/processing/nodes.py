@@ -8,8 +8,8 @@ import os.path
 FILES = 1024
 
 # Plotting parameters
-RANGE = 1.0
-BINS = 4096
+RANGE = 4.0
+BINS = 256
 
 print("Reading data files...")
 
@@ -51,7 +51,7 @@ y_coordinates = data[np.logical_and(np.logical_and(data[:, 0] == 0, np.abs(
 sign_values = data[np.logical_and(np.logical_and(data[:, 0] == 0, np.abs(
     data[:, 1]) < RANGE), np.abs(data[:, 2]) < RANGE), 3]
 
-print(f"Average data point density of {sign_values.shape[0] / (BINS ^ 2)}!")
+print(f"Average data point density of {sign_values.shape[0] / (BINS ** 2)}!")
 
 print("Plotting and saving figures...")
 
@@ -61,22 +61,18 @@ coordinate_bins = np.linspace(-RANGE, RANGE, BINS + 1)
 binned_density = sp.stats.binned_statistic_2d(
     x_coordinates, y_coordinates, sign_values, bins=[coordinate_bins, coordinate_bins])
 
-image = mp.imshow(binned_density.statistic.T,
-                  extent=[-RANGE, RANGE, -RANGE, RANGE])
-bar = mp.colorbar(image)
+pixel_map = np.nan_to_num(binned_density.statistic.T)
 
-mp.tight_layout()
+# Filter to either positive or negative
+pixel_map[pixel_map == -1.0] = -0.5
+pixel_map[pixel_map == 1.0] = 0.5
 
-mp.savefig('src/processing/output/density.png', dpi=300)
-
-mp.clf()
+pixel_map = np.floor(pixel_map)
 
 # Only leave the raw image
 mp.axis('off')
 
-# Adjust the countours here with the levels argument
-figure = mp.contour(binned_density.statistic.T, levels=[0])
+image = mp.imshow(pixel_map, interpolation='none', cmap='binary')
 
-# Change the dpi here for a different amount of pixels
 mp.savefig('src/processing/output/nodes.png',
-           dpi=300, bbox_inches='tight', pad_inches=0)
+           dpi=BINS * 240 / 887, bbox_inches='tight', pad_inches=0)
