@@ -210,14 +210,6 @@ if __name__ == "__main__":
     # Read distribution data
     data = loadData()
 
-    # Print statistics for the observables
-    point_number = int(max(data[:, 1])) * int(max(data[:, 2]))
-
-    with open("src/processing/output/observables.csv", "a") as file:
-        for i in range(FILES):
-            file.write(
-                f"{i}, {tc.mean(data[0:(i + 1)*point_number, 3]).item()}, {tc.mean(data[0:(i + 1)*point_number, 7]).item()}, {tc.mean(data[0:(i + 1)*point_number, 8]).item()}\n")
-
     # Build backflow coordinate mapping tensor
     buildBackflowMap(data)
 

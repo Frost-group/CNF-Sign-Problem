@@ -174,7 +174,7 @@ void XSimulation::Dump(std::ostream &observables_file, std::ostream &data_file, 
 
   optimal_backflow_value = factor.real() * temperature / optimal_backflow_value;
 
-  observables_file << energy.real() << optimal_backflow_value << ", " << factor.real() << std::endl;
+  observables_file << energy.real() << ", " << sign.real() << ", " << optimal_backflow_value << ", " << factor.real() << std::endl;
 }
 
 XSimulation::~XSimulation()
