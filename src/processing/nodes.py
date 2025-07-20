@@ -8,8 +8,8 @@ import os.path
 FILES = 1024
 
 # Plotting parameters
-RANGE = 4.0
-BINS = 256
+RANGE = 8.0
+BINS = 1024
 
 print("Reading data files...")
 
@@ -21,7 +21,7 @@ if os.path.isfile("src/processing/output/density.bin"):
 else:
     for i in range(FILES):
 
-        print(f"Processing file {i}...")
+        print(f"Processing file {i + 1}...")
 
         # Check if file is not empty from simulation failure
         if os.path.getsize(
@@ -51,8 +51,6 @@ y_coordinates = data[np.logical_and(np.logical_and(data[:, 0] == 0, np.abs(
 sign_values = data[np.logical_and(np.logical_and(data[:, 0] == 0, np.abs(
     data[:, 1]) < RANGE), np.abs(data[:, 2]) < RANGE), 3]
 
-print(f"Average data point density of {sign_values.shape[0] / (BINS ** 2)}!")
-
 print("Plotting and saving figures...")
 
 # Bin the statistics
@@ -61,18 +59,23 @@ coordinate_bins = np.linspace(-RANGE, RANGE, BINS + 1)
 binned_density = sp.stats.binned_statistic_2d(
     x_coordinates, y_coordinates, sign_values, bins=[coordinate_bins, coordinate_bins])
 
+point_count = sp.stats.binned_statistic_2d(
+    x_coordinates, y_coordinates, None, bins=[coordinate_bins, coordinate_bins], statistic='count')
+
 pixel_map = np.nan_to_num(binned_density.statistic.T)
-
-# Filter to either positive or negative
-pixel_map[pixel_map == -1.0] = -0.5
-pixel_map[pixel_map == 1.0] = 0.5
-
-pixel_map = np.floor(pixel_map)
 
 # Only leave the raw image
 mp.axis('off')
 
-image = mp.imshow(pixel_map, interpolation='none', cmap='binary')
+mp.imshow(pixel_map, interpolation='none', cmap='seismic')
 
-mp.savefig('src/processing/output/nodes.png',
-           dpi=BINS * 240 / 887, bbox_inches='tight', pad_inches=0)
+mp.savefig('src/processing/output/nodes.png', dpi=BINS *
+           240 / 887, bbox_inches='tight', pad_inches=0)
+
+mp.clf()
+
+image = mp.imshow(point_count.statistic.T,
+                  extent=[-RANGE, RANGE, -RANGE, RANGE], norm='log')
+mp.colorbar(image)
+
+mp.savefig('src/processing/output/points.png', dpi=300)
