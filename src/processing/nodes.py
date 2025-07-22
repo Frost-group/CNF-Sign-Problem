@@ -41,28 +41,22 @@ else:
     pl.dump(data, open(
         f'src/processing/output/density.bin', 'ab'))
 
-print(f"Found {FILES} data files! Processing data...")
+    print(f"Found {FILES} data files!")
 
-# Choose one particle and the points in range
-x_coordinates = data[np.logical_and(np.logical_and(data[:, 0] == 0, np.abs(
-    data[:, 1]) < RANGE), np.abs(data[:, 2]) < RANGE), 1]
-y_coordinates = data[np.logical_and(np.logical_and(data[:, 0] == 0, np.abs(
-    data[:, 1]) < RANGE), np.abs(data[:, 2]) < RANGE), 2]
-sign_values = data[np.logical_and(np.logical_and(data[:, 0] == 0, np.abs(
-    data[:, 1]) < RANGE), np.abs(data[:, 2]) < RANGE), 3]
-
-print("Plotting and saving figures...")
+print("Processing data...")
 
 # Bin the statistics
 coordinate_bins = np.linspace(-RANGE, RANGE, BINS + 1)
 
-binned_density = sp.stats.binned_statistic_2d(
-    x_coordinates, y_coordinates, sign_values, bins=[coordinate_bins, coordinate_bins])
+binned_signs = sp.stats.binned_statistic_2d(
+    data[:, 0], data[:, 1], data[:, 2], bins=[coordinate_bins, coordinate_bins])
 
-point_count = sp.stats.binned_statistic_2d(
-    x_coordinates, y_coordinates, None, bins=[coordinate_bins, coordinate_bins], statistic='count')
+binned_deviations = sp.stats.binned_statistic_2d(
+    data[:, 0], data[:, 1], data[:, 2], bins=[coordinate_bins, coordinate_bins], statistic='std')
 
-pixel_map = np.nan_to_num(binned_density.statistic.T)
+pixel_map = np.nan_to_num(binned_signs.statistic.T)
+
+print("Plotting and saving figures...")
 
 # Only leave the raw image
 mp.axis('off')
@@ -74,8 +68,8 @@ mp.savefig('src/processing/output/nodes.png', dpi=BINS *
 
 mp.clf()
 
-image = mp.imshow(point_count.statistic.T,
-                  extent=[-RANGE, RANGE, -RANGE, RANGE], norm='log')
+image = mp.imshow(binned_deviations.statistic.T,
+                  extent=[-RANGE, RANGE, -RANGE, RANGE])
 mp.colorbar(image)
 
 mp.savefig('src/processing/output/points.png', dpi=300)

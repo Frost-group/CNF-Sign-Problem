@@ -36,7 +36,7 @@ public:
   void RelativeDistance(XParticle *p1, XParticle *p2, XNum *displace);
   XSimulation() {}
   void Initial(std::istream &in, XNum seed);
-  void Dump(std::ostream &observables_file, std::ostream &data_file, std::ostream &density_file, bool save_distributions);
+  void Dump(std::ostream &observables_file, std::ostream &data_file, std::ostream &density_file);
   void VelocityRescale();
   XNum *Force();
   void UpdateMNHC_VV3();
@@ -69,6 +69,13 @@ public:
   XNum calculateDeterminant(XNum *matrix);
   XNum *getBackflowShift(XParticle *particle);
   XNum getBackflowAdjustment();
+
+  // Define strength of backflows
+  XNum strengths[1] = {-15.83};
+  XNum scales[1] = {0.05374};
+
+  // Control static particles
+  int mobile_particle = -1;
 };
 
 #endif

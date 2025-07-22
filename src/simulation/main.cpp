@@ -25,7 +25,7 @@ int main(int argc, char *argv[])
 
   t = clock();
 
-  for (i = 0; i < simul.step; ++i)
+  for (i = 1; i <= simul.step; ++i)
   {
     simul.UpdateMNHC_VV3();
 
@@ -38,13 +38,9 @@ int main(int argc, char *argv[])
     if (i % simul.skip == 0)
     {
       std::cout << "Completed " << i << " steps!" << std::endl;
-      simul.Dump(observables_file, data_file, density_file, false);
+      simul.Dump(observables_file, data_file, density_file);
     }
   }
-
-  std::cout << "Saving distributions..." << std::endl;
-
-  simul.Dump(observables_file, data_file, density_file, true);
 
   observables_file.close();
   density_file.close();

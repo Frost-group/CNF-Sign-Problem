@@ -130,9 +130,47 @@ void XSimulation::Initial(std::istream &in, XNum seed)
   ForceCache = NULL;
   count = 0;
   ok = true;
+
+  // Set static random positions for the not mobile particles
+  if (mobile_particle >= 0)
+  {
+    // Choose the single mobile particle
+    mobile_particle = std::floor(XRandFloat() * N);
+
+    // Set the immobile particle coordinate sames across all beads
+    for (l = 0; l < N; ++l)
+      if (l != mobile_particle)
+      {
+        XNum *position = new XNum[D];
+
+        std::cout << "Fixed position for particle " << l << " at [";
+
+        for (i = 0; i < D; ++i)
+        {
+          position[i] = 1.0 * (XRandFloat() - 0.5);
+
+          if (i > 0)
+            std ::cout << ", ";
+
+          std::cout << position[i];
+        }
+
+        std::cout << "]." << std::endl;
+
+        for (j = 0; j < P; ++j)
+          for (i = 0; i < D; ++i)
+            particles[l * P + j].coor[i] = position[i];
+
+        delete[] position;
+      }
+  }
+
+  // For grid search cross-check
+  // scales[0] = 0.01 + 0.09 * XRandFloat();
+  // strengths[0] = 30.0 * XRandFloat();
 }
 
-void XSimulation::Dump(std::ostream &observables_file, std::ostream &data_file, std::ostream &density_file, bool save_distributions)
+void XSimulation::Dump(std::ostream &observables_file, std::ostream &data_file, std::ostream &density_file)
 {
   std::complex<double> sign = std::exp(Partition2() - Partition());
   XNum backflow_adjustment = getBackflowAdjustment();
@@ -143,15 +181,23 @@ void XSimulation::Dump(std::ostream &observables_file, std::ostream &data_file, 
 
   int l, j;
 
-  if (save_distributions)
+  // Save data for the machine learning algorithm and the density
+  for (j = 1; j <= P; ++j)
     for (l = 1; l <= N; ++l)
-      for (j = 1; j <= P; ++j)
-      {
-        int index = Index(l, j);
+    {
+      int index = Index(l, j);
 
-        data_file << temperature << ", " << l << ", " << j << ", " << sign.real() << ", " << particles[index].coor[0] << ", " << particles[index].coor[1] << ", " << 0.0 << std::endl;
-      }
+      XNum *shift = getBackflowShift(&particles[index]);
 
+      data_file << temperature << ", " << l << ", " << j << ", " << factor.real() << ", " << particles[index].coor[0] + shift[0] << ", " << particles[index].coor[1] + shift[1] << ", " << 0.0 << ", " << backflow_adjustment << std::endl;
+
+      if (l - 1 == mobile_particle && mobile_particle >= 0)
+        density_file << particles[index].coor[0] + shift[0] << ", " << particles[index].coor[1] + shift[1] << ", " << factor.real() << ", " << backflow_adjustment << std::endl;
+
+      delete[] shift;
+    }
+
+  // Calculate any additional observables
   XNum optimal_backflow_value = 0.0;
 
   for (l = 0; l < N * P; ++l)
@@ -167,14 +213,12 @@ void XSimulation::Dump(std::ostream &observables_file, std::ostream &data_file, 
       delete[] j_shift;
     }
 
-    density_file << std::floor(l / P) << ", " << particles[l].coor[0] + l_shift[0] << ", " << particles[l].coor[1] + l_shift[1] << ", " << sign.real() << std::endl;
-
     delete[] l_shift;
   }
 
-  optimal_backflow_value = factor.real() * temperature / optimal_backflow_value;
+  optimal_backflow_value = temperature / optimal_backflow_value;
 
-  observables_file << energy.real() << ", " << sign.real() << ", " << optimal_backflow_value << ", " << factor.real() << std::endl;
+  observables_file << energy.real() << ", " << factor.real() << ", " << sign.real() << ", " << optimal_backflow_value << std::endl;
 }
 
 XSimulation::~XSimulation()
@@ -519,6 +563,10 @@ void XSimulation::UpdateMNHC_VV3()
   XNum v[1];
   for (j = 0; j < N * P; ++j)
   {
+    // Only allow one particle to move
+    if (std::floor(j / P) != mobile_particle && mobile_particle >= 0)
+      continue;
+
     int i;
     for (i = 0; i < D; ++i)
     {
@@ -550,6 +598,10 @@ void XSimulation::UpdateMNHC_VV3()
   ForceCache = Force();
   for (j = 0; j < N * P; ++j)
   {
+    // Only allow one particle to move
+    if (std::floor(j / P) != mobile_particle && mobile_particle >= 0)
+      continue;
+
     int i;
     for (i = 0; i < D; ++i)
     {
@@ -707,11 +759,6 @@ std::complex<double> XSimulation::Partition2()
 }
 
 // Calculate the backflow shift
-#define BACKFLOWS 1
-
-const XNum strengths[BACKFLOWS] = {-15.83};
-const XNum scales[BACKFLOWS] = {0.05374};
-
 XNum *XSimulation::getBackflowShift(XParticle *particle)
 {
   XNum *shift = new XNum[D];
@@ -721,8 +768,10 @@ XNum *XSimulation::getBackflowShift(XParticle *particle)
     shift[dimension] = 0.0;
 
   // Make no backflow simulations more efficient
-  if (BACKFLOWS == 1 && strengths[0] == 0.0)
+  if (sizeof(strengths) / sizeof(strengths[0]) == 1 && strengths[0] == 0.0)
     return shift;
+
+  std::cout << "A";
 
   // Only allow backflows to apply at the same imaginary time step
   int particle_index;
@@ -740,7 +789,7 @@ XNum *XSimulation::getBackflowShift(XParticle *particle)
 
     // Apply backflows
     int backflow;
-    for (backflow = 0; backflow < BACKFLOWS; ++backflow)
+    for (backflow = 0; backflow < sizeof(strengths) / sizeof(strengths[0]); ++backflow)
       for (dimension = 0; dimension < D; ++dimension)
         shift[dimension] += (particle->coor[dimension] - other_particle.coor[dimension]) * strengths[backflow] / (1.0 + pow(distance / scales[backflow], 3));
   }
@@ -751,7 +800,7 @@ XNum *XSimulation::getBackflowShift(XParticle *particle)
 XNum XSimulation::getBackflowAdjustment()
 {
   // Make no backflow simulations more efficient
-  if (BACKFLOWS == 1 && strengths[0] == 0.0)
+  if (sizeof(strengths) / sizeof(strengths[0]) == 1 && strengths[0] == 0.0)
     return 1.0;
 
   XNum *jacobian = new XNum[N * N];
@@ -797,7 +846,7 @@ XNum XSimulation::getJacobianElement(int untransformed_index, int transformed_in
 
     // Apply backflows
     int backflow;
-    for (backflow = 0; backflow < BACKFLOWS; ++backflow)
+    for (backflow = 0; backflow < sizeof(strengths) / sizeof(strengths[0]); ++backflow)
       if (untransformed_index == transformed_index)
         element += strengths[backflow] * (pow(distance / scales[backflow], 6) + 2.0) / pow(1.0 + pow(distance / scales[backflow], 3), 2);
       else
