@@ -76,6 +76,7 @@ public:
 
   // Control static particles
   int mobile_particle = -1;
+  int static_seed = 1;
 };
 
 #endif

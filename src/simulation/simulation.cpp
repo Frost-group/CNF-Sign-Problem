@@ -134,8 +134,8 @@ void XSimulation::Initial(std::istream &in, XNum seed)
   // Set static random positions for the not mobile particles
   if (mobile_particle >= 0)
   {
-    // Choose the single mobile particle
-    mobile_particle = std::floor(XRandFloat() * N);
+    // Same fixed positions across all simulations
+    XSetRandSeed(static_seed);
 
     // Set the immobile particle coordinate sames across all beads
     for (l = 0; l < N; ++l)
@@ -163,6 +163,8 @@ void XSimulation::Initial(std::istream &in, XNum seed)
 
         delete[] position;
       }
+
+    XSetRandSeed(seed);
   }
 
   // For grid search cross-check
@@ -770,8 +772,6 @@ XNum *XSimulation::getBackflowShift(XParticle *particle)
   // Make no backflow simulations more efficient
   if (sizeof(strengths) / sizeof(strengths[0]) == 1 && strengths[0] == 0.0)
     return shift;
-
-  std::cout << "A";
 
   // Only allow backflows to apply at the same imaginary time step
   int particle_index;
