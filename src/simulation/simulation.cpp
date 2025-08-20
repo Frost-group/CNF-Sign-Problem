@@ -126,6 +126,7 @@ void XSimulation::Initial(std::istream &in, XNum seed)
   ForceVBCache = new XNum[D * N * P];
   for (i = 0; i < D; ++i)
     center.coor[i] = 0.0;
+  center.n = 0;
   t = 0;
   ForceCache = NULL;
   count = 0;
@@ -770,7 +771,7 @@ XNum *XSimulation::getBackflowShift(XParticle *particle)
     shift[dimension] = 0.0;
 
   // Make no backflow simulations more efficient
-  if (sizeof(strengths) / sizeof(strengths[0]) == 1 && strengths[0] == 0.0)
+  if (sizeof(strengths) / sizeof(strengths[0]) == 1 && strengths[0] == 0.0 || particle->n == 0)
     return shift;
 
   // Only allow backflows to apply at the same imaginary time step
@@ -811,7 +812,7 @@ XNum XSimulation::getBackflowAdjustment()
   {
     for (int i = 0; i < N; i++)
       for (int j = 0; j < N; j++)
-        jacobian[i * N + j] = getJacobianElement(i, j, bead_index);
+        jacobian[i * N + j] = getJacobianElement(i + 1, j + 1, bead_index + 1);
 
     factor += calculateDeterminant(jacobian);
   }

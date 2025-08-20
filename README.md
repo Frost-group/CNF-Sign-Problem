@@ -2,7 +2,7 @@
 
 ## Introduction
 
-This a simulation code written as part of my doctoral project for attempting to mitigate the sign problem, present in electron systems. This project was built using C++ 11 and Python 3.13. Part of it uses some of the code present in the [PIMD Pro](https://github.com/xiongyunuo/pimd-pro-2) software package.
+This a simulation code written as part of my doctoral project for attempting to mitigate the sign problem, present in electron systems. This project was built using C++ 11 and Python 3.13. Part of it uses some of the code present in the [PIMD Pro](https://github.com/xiongyunuo/pimd-pro-2) software package and the [blackbox](https://github.com/paulknysh/blackbox) tool.
 
 ## Funcionality
 
@@ -21,7 +21,7 @@ ffmpeg -f image2 -r 60 -pattern_type glob -i 'src/processing/output/strength_*.p
 
 There are two main structures:
 
-- The `Processing` structure in ```src/processing/``` which contains the backflow learning and nodal plotting software,
+- The `Processing` structure in ```src/processing/``` which contains the backflow learning, nodal plotting and grid search software,
 - The `Simulation` structure in ```src/simulation/``` which contains the adjusted path integral simulation code.
 
 ## Changelog

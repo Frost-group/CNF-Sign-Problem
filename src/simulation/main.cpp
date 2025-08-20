@@ -18,6 +18,10 @@ int main(int argc, char *argv[])
 
   simul.Initial(in_file, atoi(argv[1]));
 
+  // For blackbox grid search cross-check
+  // simul.strengths[0] = atof(argv[2]);
+  // simul.scales[0] = atof(argv[3]);
+
   clock_t t;
   int i;
 
