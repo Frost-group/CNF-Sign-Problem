@@ -10,7 +10,7 @@ import os
 N = 4
 
 
-def sign(parameters):
+def var(parameters):
 
     # Make sure to not pull the same numbers between different processes
     np.random.seed(os.getpid())
@@ -49,16 +49,26 @@ def sign(parameters):
     # Cutoff first 10% of data
     thermalisation_cutoff = int(cumulative_data.shape[0] * 0.1)
 
-    # Calculate sign by removing 2% of outliers, flip to maximise
-    return -stats.trim_mean(cumulative_data[thermalisation_cutoff:, 1], 0.02) / stats.trim_mean(cumulative_data[thermalisation_cutoff:, 1] / cumulative_data[thermalisation_cutoff:, 2], 0.02)
+    adjustment_average = stats.trim_mean(
+        cumulative_data[thermalisation_cutoff:, 1], 0.02)
+    energy_average = stats.trim_mean(
+        cumulative_data[thermalisation_cutoff:, 0], 0.02)
+
+    adjustment_variance = stats.mstats.trimmed_var(
+        cumulative_data[thermalisation_cutoff:, 1], 0.02)
+    energy_variance = stats.mstats.trimmed_var(
+        cumulative_data[thermalisation_cutoff:, 0], 0.02)
+
+    # Calculate variance of the energy by removing 2% of outliers
+    return energy_average / adjustment_average * np.sqrt(energy_variance ** 2 / energy_average ** 2 + adjustment_variance ** 2 / adjustment_average**2)
 
 
 if __name__ == "__main__":
-    result = bb.minimize(f=sign, domain=[[-10.0, -20.0], [
+    result = bb.minimize(f=var, domain=[[-10.0, -20.0], [
                          0.025, 0.075]], budget=96, batch=24)
 
     print(
-        f"Found best sign of value {-result['best_f']} at {result['best_x']}!")
+        f"Found best energy variance of value {-result['best_f']} at {result['best_x']}!")
 
     print(
-        f"Data was gathered at backflow parameters: \n{result['all_xs']}\nThe corresponding flipped sign values were:\n{result['all_fs']}")
+        f"Data was gathered at backflow parameters: \n{result['all_xs']}\nThe corresponding energy variance values were:\n{result['all_fs']}")
