@@ -1,0 +1,14 @@
+cff-version: 1.0.0
+message: "If you use this software, please cite it as below."
+authors:
+  - family-names: Vitenburgs
+    given-names: Ingvars
+    orcid: https://orcid.org/0000-0002-5816-9998
+  - family-names: Frost
+    given-names: Jarvist Moore
+    orcid: https://orcid.org/0000-0003-1938-4430
+title: "Hydrodynamic Backflow for Easing the Fermion Sign in Finite-Temperature Electron Path Integral Simulations"
+version: 1.0
+date-released: 2026-03-19
+repository-code: "https://github.com/Frost-group/CNF-Sign-Problem"
+license: CC-BY-NC-SA-4.0
