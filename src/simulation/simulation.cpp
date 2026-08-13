@@ -207,7 +207,7 @@ void XSimulation::Dump(std::ostream &observables_file, std::ostream &data_file, 
   {
     XNum *l_shift = getBackflowShift(&particles[l]);
 
-    for (j = 0; j <= l; ++j)
+    for (j = 0; j < l; ++j)
     {
       XNum *j_shift = getBackflowShift(&particles[j]);
 

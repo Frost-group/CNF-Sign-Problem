@@ -8,6 +8,7 @@ import os.path
 FILES = 1024
 
 # Plotting parameters
+MOMENTA = 16
 RANGE = 4.0
 BINS = 1024
 
@@ -63,6 +64,8 @@ bound = np.max(np.abs(pixel_map))
 
 print(f"Calculated a maximum bound of {bound}! Plotting and saving figures...")
 
+np.savetxt("src/processing/output/signs.csv", pixel_map, delimiter=", ")
+
 # Only leave the raw image
 mp.axis('off')
 
@@ -79,8 +82,30 @@ error_map = binned_deviations.statistic.T / \
 error_map = np.nan_to_num(error_map)
 error_map = np.abs(error_map)
 
+np.savetxt("src/processing/output/errors.csv", error_map, delimiter=", ")
+
 image = mp.imshow(
     error_map, extent=[-RANGE, RANGE, -RANGE, RANGE], vmin=0.0, vmax=0.2)
 mp.colorbar(image)
 
 mp.savefig('src/processing/output/errors.png', dpi=300)
+
+# Calculate momenta
+
+momenta = np.zeros((MOMENTA, 4))
+
+for m in range(MOMENTA):
+
+    momenta_x = data[:, 2] / data[:, 0] ** (m + 1)
+    momenta_y = data[:, 2] / data[:, 1] ** (m + 1)
+
+    average_x = np.mean(1 / data[:, 0] ** (m + 1))
+    average_y = np.mean(1 / data[:, 1] ** (m + 1))
+
+    momenta[m, 0] = np.mean(momenta_x) / average_x
+    momenta[m, 1] = np.std(momenta_x) / average_x / data.shape[0]
+
+    momenta[m, 2] = np.mean(momenta_y) / average_y
+    momenta[m, 3] = np.std(momenta_y) / average_y / data.shape[0]
+
+np.savetxt("src/processing/output/momenta.csv", momenta, delimiter=", ")
