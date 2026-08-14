@@ -85,14 +85,20 @@ error_map = np.abs(error_map)
 np.savetxt("src/processing/output/errors.csv", error_map, delimiter=", ")
 
 image = mp.imshow(
-    error_map, extent=[-RANGE, RANGE, -RANGE, RANGE], vmin=0.0, vmax=0.2)
+    error_map, extent=[-RANGE, RANGE, -RANGE, RANGE], vmin=0.0, vmax=1.0)
 mp.colorbar(image)
 
 mp.savefig('src/processing/output/errors.png', dpi=300)
 
 # Calculate momenta
-
 momenta = np.zeros((MOMENTA, 4))
+
+# Find a shift so everything is positive
+shift = np.ceil(np.max(np.abs(data[:, 0:2])))
+
+data[:, 0:2] += shift
+
+print(f"Shifting coordinates by {shift} for momenta calculation!")
 
 for m in range(MOMENTA):
 
@@ -103,9 +109,9 @@ for m in range(MOMENTA):
     average_y = np.mean(1 / data[:, 1] ** (m + 1))
 
     momenta[m, 0] = np.mean(momenta_x) / average_x
-    momenta[m, 1] = np.std(momenta_x) / average_x / np.sqrt(data.shape[0])
+    momenta[m, 1] = np.std(data[:, 0]) * (m + 1) / np.mean(data[:, 0]) ** (m + 2) / average_x
 
     momenta[m, 2] = np.mean(momenta_y) / average_y
-    momenta[m, 3] = np.std(momenta_y) / average_y / np.sqrt(data.shape[0])
+    momenta[m, 3] = np.std(data[:, 1]) * (m + 1) / np.mean(data[:, 1]) ** (m + 2) / average_y
 
 np.savetxt("src/processing/output/momenta.csv", momenta, delimiter=", ")
