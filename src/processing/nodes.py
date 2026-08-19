@@ -8,8 +8,8 @@ import os.path
 FILES = 1024
 
 # Plotting parameters
-MOMENTA = 16
-RANGE = 4.0
+MOMENTA = 128
+RANGE = 1.0
 BINS = 1024
 
 print("Reading data files...")
@@ -62,7 +62,8 @@ binned_counts = sp.stats.binned_statistic_2d(
 pixel_map = np.nan_to_num(binned_signs.statistic.T)
 bound = np.max(np.abs(pixel_map))
 
-print(f"Calculated a maximum bound of {bound}! Plotting and saving figures...")
+print(
+    f"Calculated a maximum bound of {bound} and average of {np.mean(data[:, 0])}! Plotting and saving data...")
 
 np.savetxt("src/processing/output/signs.csv", pixel_map, delimiter=", ")
 
@@ -91,7 +92,7 @@ mp.colorbar(image)
 mp.savefig('src/processing/output/errors.png', dpi=300)
 
 # Calculate momenta
-momenta = np.zeros((MOMENTA, 4))
+momenta = np.zeros(((MOMENTA + 1)**2, 4))
 
 # Find a shift so everything is positive
 shift = np.ceil(np.max(np.abs(data[:, 0:2])))
@@ -100,18 +101,20 @@ data[:, 0:2] += shift
 
 print(f"Shifting coordinates by {shift} for momenta calculation!")
 
-for m in range(MOMENTA):
+for m_x in range(0, MOMENTA + 1):
+    for m_y in range(0, MOMENTA + 1):
 
-    momenta_x = data[:, 2] / data[:, 0] ** (m + 1)
-    momenta_y = data[:, 2] / data[:, 1] ** (m + 1)
+        print(f"Calculating mometum ({m_x}, {m_y})...")
 
-    average_x = np.mean(1 / data[:, 0] ** (m + 1))
-    average_y = np.mean(1 / data[:, 1] ** (m + 1))
+        index = m_x * (MOMENTA + 1) + m_y
 
-    momenta[m, 0] = np.mean(momenta_x) / average_x
-    momenta[m, 1] = np.std(data[:, 0]) * (m + 1) / np.mean(data[:, 0]) ** (m + 2) / average_x
+        momenta[index, 0] = m_x
+        momenta[index, 1] = m_y
 
-    momenta[m, 2] = np.mean(momenta_y) / average_y
-    momenta[m, 3] = np.std(data[:, 1]) * (m + 1) / np.mean(data[:, 1]) ** (m + 2) / average_y
+        momenta[index, 2] = np.mean(data[:, 2] / data[:, 0] ** m_x / data[:, 1]
+                                    ** m_y) / np.mean(1 / data[:, 0] ** m_x / data[:, 1] ** m_y)
+
+        momenta[index, 3] = np.sqrt((np.std(data[:, 2]) / np.mean(data[:, 2]))**2 + 2 * (m_x * np.std(data[:, 0]) / np.mean(
+            data[:, 0]))**2 + 2 * (m_x * np.std(data[:, 1]) / np.mean(data[:, 1]))**2) / np.sqrt(data.shape[0])
 
 np.savetxt("src/processing/output/momenta.csv", momenta, delimiter=", ")
